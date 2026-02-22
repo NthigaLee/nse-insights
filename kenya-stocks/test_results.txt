@@ -1,0 +1,148 @@
+
+------------------------------------------------------------------------
+  ABSA_Sep2020  —  ABSA_Bank_Kenya_Plc_30_Sep_2020_financials.pdf
+------------------------------------------------------------------------
+  Units: KES_thousands  |  Consolidation: group_and_company
+
+  ✓  net_interest_income        16,801,899
+  ✓  revenue                    24,321,027
+  ✓  profit_before_tax          8,781,639
+  ✓  profit_after_tax           5,347,181
+  ✓  basic_eps                  0.98
+  ✓  dividend_per_share         1.1
+  ✗  total_assets               None
+  ✓  total_equity               42,967,475
+  ✓  customer_deposits          5,025,588
+  ✓  loans_and_advances         4,716,945
+
+------------------------------------------------------------------------
+  ABSA_Dec2023  —  ABSA_Bank_Kenya_Plc_31_Dec_2023_audited.pdf
+------------------------------------------------------------------------
+  Units: KES_thousands  |  Consolidation: group_and_company
+
+  ✓  net_interest_income        32,131,322
+  ✓  revenue                    44,555,765
+  ✓  profit_before_tax          19,832,431
+  ✓  profit_after_tax           30,681,559
+  ✓  basic_eps                  2.55
+  ✓  dividend_per_share         1.35
+  ✓  total_assets               477,290,548
+  ✓  total_equity               60,811,301
+  ✓  customer_deposits          7,114,100
+  ✗  loans_and_advances         None
+
+------------------------------------------------------------------------
+  ABSA_Jun2024  —  ABSA_Bank_Kenya_Plc_30_Jun_2024_financials.pdf
+------------------------------------------------------------------------
+  Units: KES_thousands  |  Consolidation: group_and_company
+
+  ✓  net_interest_income        19,110,109
+  ✓  revenue                    26,410,512
+  ✓  profit_before_tax          11,276,560
+  ✓  profit_after_tax           7,735,100
+  ✓  basic_eps                  1.42
+  ✓  dividend_per_share         0.2
+  ✗  total_assets               None
+  ✓  total_equity               60,388,690
+  ✓  customer_deposits          4,747,773
+  ✗  loans_and_advances         None
+
+------------------------------------------------------------------------
+  SCBK_Jun2019  —  Standard_Chartered_Bank_Kenya_Ltd_30_Jun_2019_financials.pdf
+------------------------------------------------------------------------
+  Units: KES_thousands  |  Consolidation: group_and_company
+
+  ✓  net_interest_income        9,842,875
+  ✓  revenue                    14,663,490
+  ✓  profit_before_tax          6,920,271
+  ✓  profit_after_tax           4,705,902
+  ✓  basic_eps                  12.76
+  ✓  dividend_per_share         19
+  ✓  total_assets               295,955,246
+  ✓  total_equity               44,641,514
+  ✓  customer_deposits          230,845,308
+  ✓  loans_and_advances         111,748,653
+
+------------------------------------------------------------------------
+  SCBK_Jun2022  —  Standard_Chartered_Bank_Kenya_Ltd_30_Jun_2022_financials.pdf
+------------------------------------------------------------------------
+  Units: KES_thousands  |  Consolidation: group_and_company
+
+  ✓  net_interest_income        9,115,386
+  ✓  revenue                    14,112,995
+  ✓  profit_before_tax          7,569,331
+  ✓  profit_after_tax           9,043,839
+  ✓  basic_eps                  12.69
+  ✓  dividend_per_share         19
+  ✓  total_assets               345,646,341
+  ✓  total_equity               51,706,369
+  ✓  customer_deposits          278,186,884
+  ✓  loans_and_advances         130,275,654
+
+------------------------------------------------------------------------
+  SCBK_Dec2023  —  Standard_Chartered_Bank_Kenya_Ltd_31_Dec_2023_financials.pdf
+------------------------------------------------------------------------
+  Units: KES_thousands  |  Consolidation: group_and_company
+
+  ✓  net_interest_income        22,223,065
+  ✓  revenue                    33,977,048
+  ✓  profit_before_tax          17,103,199
+  ✓  profit_after_tax           12,057,935
+  ✓  basic_eps                  31.47
+  ✓  dividend_per_share         22
+  ✓  total_assets               381,260,015
+  ✓  total_equity               56,136,730
+  ✓  customer_deposits          278,879,309
+  ✓  loans_and_advances         139,412,560
+
+------------------------------------------------------------------------
+  SCBK_Dec2024  —  Standard_Chartered_Bank_Ltd_31_Dec_2024_financials.pdf
+------------------------------------------------------------------------
+  Units: KES_thousands  |  Consolidation: group_and_company
+
+  ✓  net_interest_income        29,325,087
+  ✓  revenue                    41,728,586
+  ✓  profit_before_tax          19,668,482
+  ✓  profit_after_tax           13,835,467
+  ✓  basic_eps                  36.17
+  ✓  dividend_per_share         29
+  ✓  total_assets               428,962,175
+  ✓  total_equity               61,532,267
+  ✓  customer_deposits          342,853,241
+  ✓  loans_and_advances         163,161,777
+
+------------------------------------------------------------------------
+  SCOM_Mar2020  —  Safaricom_Plc_31_Mar_2020_audited.pdf
+------------------------------------------------------------------------
+  Units: KES_thousands  |  Consolidation: group_and_company
+
+  ✗  net_interest_income        None
+  ✓  revenue                    251.22
+  ✓  profit_before_tax          26.76
+  ✓  profit_after_tax           73.66
+  ✓  basic_eps                  1.86
+  ✓  dividend_per_share         1.4
+  ✗  total_assets               None
+  ✗  total_equity               None
+  ✗  customer_deposits          None
+  ✗  loans_and_advances         None
+
+------------------------------------------------------------------------
+  SCOM_Mar2024  —  extracts_from_the_financial_books_of_Safaricom_PLC_31_Mar_2024_audited.pdf
+------------------------------------------------------------------------
+  Units: KES_thousands  |  Consolidation: group_and_company
+
+  ✗  net_interest_income        None
+  ✓  revenue                    335,353
+  ✓  profit_before_tax          84,687
+  ✓  profit_after_tax           42,658
+  ✓  basic_eps                  1.57
+  ✗  dividend_per_share         None
+  ✓  total_assets               641,164
+  ✓  total_equity               335,748
+  ✗  customer_deposits          None
+  ✗  loans_and_advances         None
+
+------------------------------------------------------------------------
+Done.
+
