@@ -26,12 +26,7 @@
     <div class="search-bar">
       <select id="company-select">
         <option value="">-- Select Company --</option>
-        <option value="ABSA">ABSA</option>
-        <option value="STANCHART">STANCHART</option>
-        <option value="SAFARICOM">SAFARICOM</option>
-        <option value="KCB">KCB</option>
-        <option value="EQUITY">EQUITY</option>
-        <option value="COOP">COOP</option>
+        <!-- Options populated dynamically from NSE_COMPANIES in app.js -->
       </select>
       <span class="exchange-tag">NSE</span>
       <button id="search-btn" onclick="loadCompany()">Search</button>
@@ -71,7 +66,7 @@
       </div>
     </div>
 
-    <!-- Charts Grid Row 1 -->
+    <!-- Charts Grid Row 1 — Income Statement -->
     <div class="charts-grid" id="charts-row1">
       <div class="chart-card" id="card-revenue">
         <div class="chart-card-header">
@@ -107,6 +102,48 @@
           <span class="chart-expand">⤢</span>
         </div>
         <div class="chart-wrap"><canvas id="chart-nii"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Charts Grid Row 2 — Balance Sheet -->
+    <div class="chart-controls" style="margin-top:1.5rem;">
+      <span class="chart-section-label">Balance Sheet</span>
+    </div>
+    <div class="charts-grid" id="charts-row2">
+      <div class="chart-card" id="card-assets">
+        <div class="chart-card-header">
+          <span class="chart-title">Total Assets</span>
+          <span class="chart-expand">⤢</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-assets"></canvas></div>
+      </div>
+      <div class="chart-card" id="card-equity">
+        <div class="chart-card-header">
+          <span class="chart-title">Total Equity</span>
+          <span class="chart-expand">⤢</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-equity"></canvas></div>
+      </div>
+      <div class="chart-card" id="card-deposits">
+        <div class="chart-card-header">
+          <span class="chart-title">Customer Deposits</span>
+          <span class="chart-expand">⤢</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-deposits"></canvas></div>
+      </div>
+      <div class="chart-card" id="card-loans">
+        <div class="chart-card-header">
+          <span class="chart-title">Loans &amp; Advances</span>
+          <span class="chart-expand">⤢</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-loans"></canvas></div>
+      </div>
+      <div class="chart-card" id="card-ebitda">
+        <div class="chart-card-header">
+          <span class="chart-title">EBITDA / M-PESA Rev</span>
+          <span class="chart-expand">⤢</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-ebitda"></canvas></div>
       </div>
     </div>
 

@@ -126,11 +126,12 @@ function loadCompany() {
   document.getElementById('company-meta').textContent = `${co.ticker} | ${co.exchange} · ${co.sector}`;
   document.getElementById('company-price').textContent = fmtPrice(co.latestPrice);
 
-  // EPS from latest year
-  const latest = co.annuals[co.annuals.length - 1];
-  document.getElementById('company-eps-pill').textContent = `EPS (${latest.year}): ${fmtEPS(latest.eps)}`;
+  // Latest period (may be quarterly — more up-to-date than last annual)
+  const latest = co.latestPeriod || co.annuals[co.annuals.length - 1];
+  const latestLabel = latest.period || latest.year;
+  document.getElementById('company-eps-pill').textContent = `EPS (${latestLabel}): ${fmtEPS(latest.eps)}`;
   document.getElementById('company-latest-year').textContent =
-    `Units: KES ${co.units} · Last updated: ${latest.year}`;
+    `Units: KES ${co.units} · Last period: ${latestLabel}`;
 
   // -- Stats Grid --
   renderStatsGrid(co);
@@ -141,8 +142,12 @@ function loadCompany() {
 
 // ---- Stats Grid ----
 function renderStatsGrid(co) {
-  const latest = co.annuals[co.annuals.length - 1];
-  const prev   = co.annuals.length >= 2 ? co.annuals[co.annuals.length - 2] : null;
+  // Use latestPeriod (could be quarterly) for the stats card — more up-to-date
+  const latest = co.latestPeriod || co.annuals[co.annuals.length - 1];
+  const latestLabel = latest.period || latest.year;
+  // For YoY comparison use second-to-last annual row
+  const annualRows = co.annuals;
+  const prev = annualRows.length >= 2 ? annualRows[annualRows.length - 2] : null;
 
   function growth(curr, prev) {
     if (!curr || !prev) return null;
@@ -198,9 +203,10 @@ function renderStatsGrid(co) {
     {
       title: 'Data Coverage',
       rows: [
-        { label: 'First Year',  val: co.annuals[0].year },
-        { label: 'Last Year',   val: latest.year },
-        { label: 'Annual Pts',  val: co.annuals.length },
+        { label: 'First Period', val: co.annuals[0].period || co.annuals[0].year },
+        { label: 'Last Period',  val: latestLabel },
+        { label: 'Period Type',  val: latest.periodType || '—' },
+        { label: 'Data Points',  val: co.annuals.length },
       ]
     }
   ];
@@ -222,7 +228,8 @@ function renderStatsGrid(co) {
 // ---- Render Charts ----
 function renderCharts(co) {
   const annuals = co.annuals;
-  const labels  = annuals.map(d => d.year);
+  // Use compact period label (e.g. "Dec2023", "H1FY2024") — fall back to year
+  const labels  = annuals.map(d => d.period || d.year);
   const n       = annuals.length;
   const colors  = barColors(n);
 
@@ -271,6 +278,49 @@ function renderCharts(co) {
     borderRadius: 3,
     borderSkipped: false,
   }]);
+
+  // ── Balance Sheet charts ────────────────────────────────────────────────────
+  makeBarChart('chart-assets', labels, [{
+    label: 'Total Assets',
+    data: annuals.map(d => d.totalAssets),
+    backgroundColor: colors,
+    borderRadius: 3,
+    borderSkipped: false,
+  }]);
+
+  makeBarChart('chart-equity', labels, [{
+    label: 'Total Equity',
+    data: annuals.map(d => d.totalEquity),
+    backgroundColor: colors,
+    borderRadius: 3,
+    borderSkipped: false,
+  }]);
+
+  makeBarChart('chart-deposits', labels, [{
+    label: 'Customer Deposits',
+    data: annuals.map(d => d.deposits),
+    backgroundColor: colors,
+    borderRadius: 3,
+    borderSkipped: false,
+  }]);
+
+  makeBarChart('chart-loans', labels, [{
+    label: 'Loans & Advances',
+    data: annuals.map(d => d.loans),
+    backgroundColor: colors,
+    borderRadius: 3,
+    borderSkipped: false,
+  }]);
+
+  // EBITDA for telcos, M-PESA revenue for Safaricom, or skip for others
+  const ebitdaData = annuals.map(d => d.mpesa ?? d.ebitda);
+  makeBarChart('chart-ebitda', labels, [{
+    label: co.ticker === 'SCOM' ? 'M-PESA Revenue' : 'EBITDA',
+    data: ebitdaData,
+    backgroundColor: colors,
+    borderRadius: 3,
+    borderSkipped: false,
+  }]);
 }
 
 // ---- Period Toggle ----
@@ -280,8 +330,45 @@ function setPeriod(period) {
   // Quarterly data not yet available — no-op for now
 }
 
+// ---- Populate dropdown from NSE_COMPANIES (grouped by sector) ----
+function populateDropdown() {
+  const sel = document.getElementById('company-select');
+
+  // Group tickers by sector
+  const sectors = {};
+  for (const [ticker, co] of Object.entries(NSE_COMPANIES)) {
+    const sec = co.sector || 'Other';
+    if (!sectors[sec]) sectors[sec] = [];
+    sectors[sec].push({ ticker, name: co.name });
+  }
+
+  // Sort sectors, put Banking first
+  const sectorOrder = ['Banking', 'Telecoms', 'FMCG', 'Insurance', 'Energy', 'Construction', 'Media', 'Agriculture', 'Manufacturing', 'Other'];
+  const sortedSectors = Object.keys(sectors).sort((a, b) => {
+    const ai = sectorOrder.indexOf(a);
+    const bi = sectorOrder.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  for (const sector of sortedSectors) {
+    const grp = document.createElement('optgroup');
+    grp.label = sector;
+    for (const { ticker, name } of sectors[sector].sort((a, b) => a.name.localeCompare(b.name))) {
+      const opt = document.createElement('option');
+      opt.value = ticker;
+      opt.textContent = `${ticker} — ${name}`;
+      grp.appendChild(opt);
+    }
+    sel.appendChild(grp);
+  }
+}
+
 // ---- Enter key on select ----
 document.addEventListener('DOMContentLoaded', () => {
+  populateDropdown();
   document.getElementById('company-select').addEventListener('keydown', e => {
     if (e.key === 'Enter') loadCompany();
   });
