@@ -90,12 +90,15 @@ def get_price(ticker: str) -> Optional[dict]:
 
 
 def get_all_prices(tickers: Optional[List[str]] = None) -> Dict[str, dict]:
-    """Fetch prices for all (or subset of) NSE tickers."""
+    """Fetch prices for all (or subset of) NSE tickers using parallel requests."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     if tickers is None:
         tickers = NSE_TICKERS
 
     now = time.time()
     results = {}
+    to_fetch = []
 
     for ticker in tickers:
         ticker = ticker.upper()
@@ -103,9 +106,18 @@ def get_all_prices(tickers: Optional[List[str]] = None) -> Dict[str, dict]:
         if cached and (now - cached[1]) < CACHE_TTL:
             results[ticker] = cached[0]
         else:
-            data = get_price(ticker)
-            if data and "error" not in data:
-                results[ticker] = data
-            time.sleep(0.1)  # polite delay
+            to_fetch.append(ticker)
+
+    if to_fetch:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(get_price, t): t for t in to_fetch}
+            for fut in as_completed(futures, timeout=25):
+                ticker = futures[fut]
+                try:
+                    data = fut.result()
+                    if data and "error" not in data:
+                        results[ticker] = data
+                except Exception:
+                    pass
 
     return results
