@@ -448,3 +448,21 @@ select option { background: var(--bg-surface); color: var(--text-primary); }
   .charts-grid { grid-template-columns: 1fr; }
   .valuation-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* Dropdown optgroup */
+select optgroup { color: #000; font-weight: 800; background-color: #e2e8f0; }
+select option   { background-color: #1e2d3d; color: #e2e8f0; }
+
+/* Stock Price Chart */
+.price-chart-section { max-width: 1200px; margin: 0 auto 1.5rem; padding: 0 1.5rem; }
+.price-chart-header  { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.price-range-group   { display: flex; background: #1e2d3d; padding: 0.2rem; border-radius: 8px; border: 1px solid #2a3f52; gap: 0.1rem; }
+.price-range-btn     { background: transparent; border: none; color: #5a6a7e; padding: 0.3rem 0.65rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+.price-range-btn:hover { color: #e2e8f0; }
+.price-range-btn.active { background: #2a3f52; color: #e2e8f0; }
+.price-change-pill   { padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700; }
+.price-change-pill.positive { background: rgba(16,185,129,0.15); color: #10b981; }
+.price-change-pill.negative { background: rgba(239,68,68,0.15); color: #ef4444; }
+.price-chart-card    { background: #1e2d3d; border: 1px solid #2a3f52; border-radius: 12px; padding: 1.25rem; }
+.price-chart-loading { text-align: center; padding: 1rem; color: #5a6a7e; font-size: 0.85rem; }
+.price-chart-error   { text-align: center; padding: 1rem; color: #f59e0b; font-size: 0.85rem; }

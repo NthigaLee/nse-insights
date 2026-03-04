@@ -278,7 +278,8 @@ const API_BASE = 'https://kenya-stocks-1.onrender.com';
 
 async function loadPrices() {
   try {
-    const resp = await fetch(`${API_BASE}/prices`);
+    const tickers = Object.keys(NSE_COMPANIES).join(',');
+    const resp = await fetch(`${API_BASE}/prices?tickers=${tickers}`);
     if (resp.ok) {
       const data = await resp.json();
       NSE_PRICES = data.tickers || {};
@@ -383,9 +384,25 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
           ticks: {
             color: '#5a6a7e', font: { size: 10 },
             callback: (v) => {
-              if (Math.abs(v) >= 1e9) return (v / 1e9).toFixed(0) + 'B';
-              if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(0) + 'M';
-              if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(0) + 'K';
+              const u = opts.units;
+              // Data stored in THOUSANDS of KES:
+              //   1,000,000 thousands = 1 Billion KES  → threshold 1e6
+              //   1,000 thousands     = 1 Million KES   → threshold 1e3
+              if (u === 'thousands') {
+                if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'B';
+                if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'M';
+                return v + 'K';
+              }
+              // Data stored in MILLIONS of KES:
+              //   1,000 millions = 1 Billion KES → threshold 1e3
+              if (u === 'millions') {
+                if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'B';
+                return v.toFixed(0) + 'M';
+              }
+              // Raw values (EPS etc.)
+              if (Math.abs(v) >= 1e9) return (v / 1e9).toFixed(1) + 'B';
+              if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+              if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'K';
               return v;
             }
           }
@@ -587,6 +604,192 @@ function renderCharts(co, period, template) {
   });
 }
 
+
+// ---- Stock Price Chart ----
+const PRICE_RANGES = {
+  '1D': { interval: '5m',  range: '1d'  },
+  '1W': { interval: '30m', range: '5d'  },
+  '1M': { interval: '1d',  range: '1mo' },
+  '6M': { interval: '1d',  range: '6mo' },
+  '1Y': { interval: '1d',  range: '1y'  },
+  '5Y': { interval: '1wk', range: '5y'  },
+};
+let _activePriceRange = '1Y';
+
+async function fetchYahooChart(ticker, interval, range) {
+  // Route through our Render backend — Yahoo Finance has no NSE Kenya data
+  try {
+    const url = `${API_BASE}/history/${encodeURIComponent(ticker)}?range=${range}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.points && json.points.length > 0) return json.points;
+  } catch (_) {}
+  return null;
+}
+
+function makePriceLineChart(canvasId, points, rangeKey) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+  const labels = points.map(p => {
+    const d = new Date(p.t);
+    if (rangeKey === '1D') return d.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+    if (rangeKey === '1W') return d.toLocaleDateString('en-KE', { weekday: 'short', hour: '2-digit' });
+    return d.toLocaleDateString('en-KE', { month: 'short', day: 'numeric', ...(rangeKey === '5Y' && { year: 'numeric' }) });
+  });
+  const values = points.map(p => p.v);
+  const first  = values[0] || 0;
+  const last   = values[values.length - 1] || 0;
+  const color  = last >= first ? '#10b981' : '#ef4444';
+  const bgColor = last >= first ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)';
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label: 'Price (KES)', data: values, borderColor: color, backgroundColor: bgColor,
+        borderWidth: 2, pointRadius: 0, tension: 0.3, fill: true }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode: 'index', intersect: false, backgroundColor: '#1e2d3d', borderColor: '#2a3f52',
+          borderWidth: 1, padding: 10, cornerRadius: 8,
+          callbacks: { label: (item) => ` KES ${item.raw?.toFixed(2)}` }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#5a6a7e', font: { size: 9 }, maxTicksLimit: 8, maxRotation: 0 } },
+        y: { position: 'right', grid: { color: 'rgba(30,45,61,0.6)', drawTicks: false }, border: { display: false },
+          ticks: { color: '#5a6a7e', font: { size: 10 }, callback: (v) => 'KES ' + v.toFixed(1) } }
+      }
+    }
+  });
+}
+
+async function loadStockPrice(ticker, rangeKey) {
+  if (!ticker) return;
+  rangeKey = rangeKey || _activePriceRange;
+  _activePriceRange = rangeKey;
+  document.querySelectorAll('.price-range-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.range === rangeKey);
+  });
+  const section   = document.getElementById('price-chart-section');
+  const loadingEl = document.getElementById('price-chart-loading');
+  const errorEl   = document.getElementById('price-chart-error');
+  section.classList.remove('hidden');
+  loadingEl.classList.remove('hidden');
+  errorEl.classList.add('hidden');
+  const { interval, range } = PRICE_RANGES[rangeKey];
+  const points = await fetchYahooChart(ticker, interval, range);
+  loadingEl.classList.add('hidden');
+  if (!points || points.length === 0) { errorEl.classList.remove('hidden'); return; }
+  const first = points[0].v, last = points[points.length - 1].v;
+  const chgPct = ((last - first) / first) * 100;
+  const chgEl  = document.getElementById('price-change-pill');
+  chgEl.textContent = `${chgPct >= 0 ? '+' : ''}${chgPct.toFixed(2)}% (${rangeKey})`;
+  chgEl.className   = 'price-change-pill ' + (chgPct >= 0 ? 'positive' : 'negative');
+  makePriceLineChart('chart-price', points, rangeKey);
+}
+
+// ---- Stock Price Chart ----
+const PRICE_RANGES = {
+  '1D': { interval: '5m',  range: '1d'  },
+  '1W': { interval: '30m', range: '5d'  },
+  '1M': { interval: '1d',  range: '1mo' },
+  '6M': { interval: '1d',  range: '6mo' },
+  '1Y': { interval: '1d',  range: '1y'  },
+  '5Y': { interval: '1wk', range: '5y'  },
+};
+let _activePriceRange = '1Y';
+
+async function fetchYahooChart(ticker, interval, range) {
+  const yfTicker = encodeURIComponent(ticker + '.NR');
+  const direct = `https://query1.finance.yahoo.com/v8/finance/chart/${yfTicker}?interval=${interval}&range=${range}`;
+  const proxy  = `https://corsproxy.io/?url=${encodeURIComponent(direct)}`;
+  for (const url of [direct, proxy]) {
+    try {
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const result = json?.chart?.result?.[0];
+      if (!result) continue;
+      const timestamps = result.timestamp;
+      const closes     = result.indicators?.quote?.[0]?.close;
+      if (!timestamps || !closes) continue;
+      return timestamps
+        .map((t, i) => ({ t: t * 1000, v: closes[i] }))
+        .filter(p => p.v !== null && p.v !== undefined);
+    } catch (_) { /* try next */ }
+  }
+  return null;
+}
+
+function makePriceLineChart(canvasId, points, rangeKey) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+  const labels = points.map(p => {
+    const d = new Date(p.t);
+    if (rangeKey === '1D') return d.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+    if (rangeKey === '1W') return d.toLocaleDateString('en-KE', { weekday: 'short', hour: '2-digit' });
+    return d.toLocaleDateString('en-KE', { month: 'short', day: 'numeric', ...(rangeKey === '5Y' && { year: 'numeric' }) });
+  });
+  const values = points.map(p => p.v);
+  const first  = values[0] || 0;
+  const last   = values[values.length - 1] || 0;
+  const color  = last >= first ? '#10b981' : '#ef4444';
+  const bgColor = last >= first ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)';
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label: 'Price (KES)', data: values, borderColor: color, backgroundColor: bgColor,
+        borderWidth: 2, pointRadius: 0, tension: 0.3, fill: true }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode: 'index', intersect: false, backgroundColor: '#1a2332', borderColor: '#2a3a4e',
+          borderWidth: 1, padding: 10, cornerRadius: 8,
+          callbacks: { label: (item) => ` KES ${item.raw?.toFixed(2)}` }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#5a6a7e', font: { size: 9 }, maxTicksLimit: 8, maxRotation: 0 } },
+        y: { position: 'right', grid: { color: 'rgba(30,45,61,0.6)', drawTicks: false }, border: { display: false },
+          ticks: { color: '#5a6a7e', font: { size: 10 }, callback: (v) => 'KES ' + v.toFixed(1) } }
+      }
+    }
+  });
+}
+
+async function loadStockPrice(ticker, rangeKey) {
+  if (!ticker) return;
+  rangeKey = rangeKey || _activePriceRange;
+  _activePriceRange = rangeKey;
+  document.querySelectorAll('.price-range-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.range === rangeKey);
+  });
+  const section   = document.getElementById('price-chart-section');
+  const loadingEl = document.getElementById('price-chart-loading');
+  const errorEl   = document.getElementById('price-chart-error');
+  section.classList.remove('hidden');
+  loadingEl.classList.remove('hidden');
+  errorEl.classList.add('hidden');
+  const { interval, range } = PRICE_RANGES[rangeKey];
+  const points = await fetchYahooChart(ticker, interval, range);
+  loadingEl.classList.add('hidden');
+  if (!points || points.length === 0) { errorEl.classList.remove('hidden'); return; }
+  const first = points[0].v, last = points[points.length - 1].v;
+  const chgPct = ((last - first) / first) * 100;
+  const chgEl  = document.getElementById('price-change-pill');
+  chgEl.textContent = `${chgPct >= 0 ? '+' : ''}${chgPct.toFixed(2)}% (${rangeKey})`;
+  chgEl.className   = 'price-change-pill ' + (chgPct >= 0 ? 'positive' : 'negative');
+  makePriceLineChart('chart-price', points, rangeKey);
+}
 // ---- Period Toggle ----
 let _currentCompany = null;
 let _currentPeriod = 'annual';
