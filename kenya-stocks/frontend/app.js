@@ -298,10 +298,11 @@ function renderCharts(co, period) {
   // Data selection
   let dataPoints = (period === 'quarterly' && hasQuarters) ? [...co.quarters] : [...co.annuals];
   
-  // Sort by period/year to ensure chronological order
+  // Sort chronologically using dateKey (ISO date) if present, else year
   dataPoints.sort((a, b) => {
-    if (a.year !== b.year) return a.year - b.year;
-    return (a.period || '').localeCompare(b.period || '');
+    const da = a.dateKey || String(a.year || '');
+    const db = b.dateKey || String(b.year || '');
+    return da.localeCompare(db);
   });
 
   const labels  = dataPoints.map(d => d.period || d.year);

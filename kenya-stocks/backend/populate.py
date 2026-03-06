@@ -69,16 +69,23 @@ def parse_period_date(record):
     return "0000-00-00"
 
 def period_label(record):
-    """Short display label like 'Dec2023' or 'H1FY2024'."""
+    """Short display label like 'Dec2023', 'H1 2024', 'Q1 2025', 'Q3 2025'."""
     raw = str(record.get("period", "") or "").strip()
     d = record.get("period_end_date", "")
     if d:
         try:
             dt = datetime.strptime(d, "%Y-%m-%d")
             ptype = record.get("period_type", "")
-            if ptype == "annual":    return dt.strftime("%b%Y")
-            if ptype == "half_year": return "H1 " + dt.strftime("%b%Y")
-            if ptype == "quarter":   return "Q " + dt.strftime("%b%Y")
+            yr = dt.year
+            mo = dt.month
+            if ptype == "annual":
+                return dt.strftime("%b%Y")
+            if ptype == "half_year":
+                return f"H1 {yr}"
+            if ptype == "quarter":
+                # Determine quarter number from month
+                q = {3: "Q1", 6: "Q2", 9: "Q3", 12: "Q4"}.get(mo, f"Q{(mo-1)//3+1}")
+                return f"{q} {yr}"
             return dt.strftime("%b%Y")
         except ValueError:
             pass
@@ -105,10 +112,17 @@ def build_annual_row(r, display_units):
     eps = clamp(r.get("basic_eps"),  MIN_EPS, MAX_EPS)
     dps = clamp(r.get("dividend_per_share"), 0, MAX_DPS)
 
+    # If PAT is null but EPS/DPS are present, they're likely wrong (scraped from wrong row)
+    # Null them out to avoid misleading displays
+    if pat is None:
+        eps = None
+        dps = None
+
     return {
         "year":        r.get("year"),
         "period":      period_label(r),
         "periodType":  r.get("period_type"),
+        "dateKey":     parse_period_date(r),   # ISO date for reliable chronological sort
         "revenue":     rev,
         "pat":         pat,
         "pbt":         pbt,
@@ -201,6 +215,17 @@ def main():
                     latest_period = row
                     break
 
+        # Build quarters[] — up to 6 most recent interim periods
+        quarter_rows = []
+        if interim:
+            interim_sorted = sorted(interim, key=parse_period_date)
+            for r in interim_sorted:
+                row = scrub_pat(build_annual_row(r, units))
+                if has_useful_data(row):
+                    quarter_rows.append(row)
+            # Keep only last 6
+            quarter_rows = quarter_rows[-6:]
+
         co_obj = {
             "name":        meta["name"],
             "ticker":      ticker,
@@ -211,6 +236,7 @@ def main():
             "units":       units,
             "latestPrice": meta["price"],
             "annuals":     annual_rows,
+            "quarters":    quarter_rows,
         }
         if latest_period:
             co_obj["latestPeriod"] = latest_period
@@ -250,6 +276,14 @@ def main():
             rc = "," if j < len(co["annuals"]) - 1 else ""
             lines.append(f'      {json.dumps(row)}{rc}')
         lines.append(f'    ],')
+
+        qrows = co.get("quarters", [])
+        lines.append(f'    quarters: [')
+        for j, row in enumerate(qrows):
+            rc = "," if j < len(qrows) - 1 else ""
+            lines.append(f'      {json.dumps(row)}{rc}')
+        lines.append(f'    ],')
+
         lines.append(f'  }}{comma}')
 
     lines.append("")
@@ -261,8 +295,9 @@ def main():
     print(f"  Companies: {', '.join(js_companies.keys())}")
     for ticker, co in js_companies.items():
         n = len(co["annuals"])
-        lp = " + 1 interim" if co.get("latestPeriod") else ""
-        print(f"  {ticker:6}: {n} annual periods{lp}")
+        q = len(co.get("quarters", []))
+        lp = " + latest interim" if co.get("latestPeriod") else ""
+        print(f"  {ticker:6}: {n} annuals, {q} quarters{lp}")
 
 if __name__ == "__main__":
     main()
