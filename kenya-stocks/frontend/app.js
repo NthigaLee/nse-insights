@@ -6,6 +6,20 @@
 let activeCompany = null;
 let chartInstances = {};
 
+// ---- TradingView NSEKE Ticker Mapping ----
+// Format: our internal ticker → TradingView NSEKE symbol
+// Note: Safaricom is SCOM on NSE (not SAFARICOM)
+const NSEKE_TICKERS = {
+  ABSA: 'NSEKE:ABSA',
+  COOP: 'NSEKE:COOP',
+  DTB:  'NSEKE:DTB',
+  EQTY: 'NSEKE:EQTY',
+  KCB:  'NSEKE:KCB',
+  NCBA: 'NSEKE:NCBA',
+  SCBK: 'NSEKE:SCBK',
+  SCOM: 'NSEKE:SCOM',  // Safaricom (if added later)
+};
+
 // ---- Chart.js Global Defaults ----
 Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = '#2a3146';
@@ -185,7 +199,10 @@ function loadCompany() {
   document.getElementById('company-logo').textContent = co.logo;
   document.getElementById('company-name').textContent = co.name;
   document.getElementById('company-meta').textContent = `${co.ticker} | ${co.exchange} · ${co.sector}`;
-  document.getElementById('company-price').textContent = fmtPrice(co.latestPrice);
+  // Price: live via TradingView chart below — static latestPrice shown in stats grid
+  const priceEl = document.getElementById('company-price');
+  priceEl.textContent = 'Live on chart';
+  priceEl.classList.add('tv-live-badge');
 
   // Latest period (may be quarterly — more up-to-date than last annual)
   const latest = co.latestPeriod || co.annuals[co.annuals.length - 1];
@@ -194,9 +211,8 @@ function loadCompany() {
   document.getElementById('company-latest-year').textContent =
     `Units: KES ${co.units} · Last period: ${latestLabel}`;
 
-  // -- Stock Price Chart --
-  _activePriceRange = '1Y';
-  loadStockPrice(co.ticker, '1Y');
+  // -- TradingView Live Price Chart --
+  initTradingViewChart(co.ticker);
 
   // -- Stats Grid --
   renderStatsGrid(co);
@@ -388,149 +404,44 @@ function renderCharts(co, period) {
   }], chartOpts);
 }
 
-// ---- Stock Price Chart ----
-const PRICE_RANGES = {
-  '1D': { interval: '5m',  range: '1d'  },
-  '1W': { interval: '30m', range: '5d'  },
-  '1M': { interval: '1d',  range: '1mo' },
-  '6M': { interval: '1d',  range: '6mo' },
-  '1Y': { interval: '1d',  range: '1y'  },
-  '5Y': { interval: '1wk', range: '5y'  },
-};
-let _activePriceRange = '1Y';
+// ---- TradingView Live Price Chart ----
+function initTradingViewChart(ticker) {
+  const nsekeTicker = NSEKE_TICKERS[ticker] || `NSEKE:${ticker}`;
 
-async function fetchYahooChart(ticker, interval, range) {
-  const yfTicker = encodeURIComponent(ticker + '.NR');
-  const direct = `https://query1.finance.yahoo.com/v8/finance/chart/${yfTicker}?interval=${interval}&range=${range}`;
-  const proxy  = `https://corsproxy.io/?url=${encodeURIComponent(direct)}`;
+  const section   = document.getElementById('tv-chart-section');
+  const container = document.getElementById('tradingview-chart-container');
+  const link      = document.getElementById('tv-open-link');
 
-  for (const url of [direct, proxy]) {
-    try {
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      if (!res.ok) continue;
-      const json = await res.json();
-      const result = json?.chart?.result?.[0];
-      if (!result) continue;
-      const timestamps = result.timestamp;
-      const closes     = result.indicators?.quote?.[0]?.close;
-      if (!timestamps || !closes) continue;
-      return timestamps
-        .map((t, i) => ({ t: t * 1000, v: closes[i] }))
-        .filter(p => p.v !== null && p.v !== undefined);
-    } catch (_) { /* try next */ }
+  section.classList.remove('hidden');
+
+  if (link) {
+    link.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(nsekeTicker)}`;
   }
-  return null;
-}
 
-function makePriceLineChart(canvasId, points, rangeKey) {
-  const ctx = document.getElementById(canvasId);
-  if (!ctx) return;
-  if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+  // Re-create inner div to force widget reset when switching companies
+  container.innerHTML = '<div id="tradingview_widget_inner" style="height:100%"></div>';
 
-  const labels = points.map(p => {
-    const d = new Date(p.t);
-    if (rangeKey === '1D') return d.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
-    if (rangeKey === '1W') return d.toLocaleDateString('en-KE', { weekday: 'short', hour: '2-digit' });
-    return d.toLocaleDateString('en-KE', { month: 'short', day: 'numeric', year: rangeKey === '5Y' ? 'numeric' : undefined });
-  });
-  const values = points.map(p => p.v);
-  const first  = values[0] || 0;
-  const last   = values[values.length - 1] || 0;
-  const color  = last >= first ? '#10b981' : '#ef4444';
-  const bgColor = last >= first ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)';
-
-  chartInstances[canvasId] = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Price (KES)',
-        data: values,
-        borderColor: color,
-        backgroundColor: bgColor,
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.3,
-        fill: true,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 300 },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          mode: 'index',
-          intersect: false,
-          backgroundColor: '#1e293b',
-          borderColor: '#334155',
-          borderWidth: 1,
-          padding: 10,
-          cornerRadius: 8,
-          callbacks: {
-            label: (item) => ` KES ${item.raw?.toFixed(2)}`,
-          }
-        }
-      },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: {
-            color: '#64748b',
-            font: { size: 9 },
-            maxTicksLimit: 8,
-            maxRotation: 0,
-          }
-        },
-        y: {
-          position: 'right',
-          grid: { color: 'rgba(51,65,85,0.4)', drawTicks: false },
-          border: { display: false },
-          ticks: {
-            color: '#64748b',
-            font: { size: 10 },
-            callback: (v) => 'KES ' + v.toFixed(1),
-          }
-        }
-      }
-    }
-  });
-}
-
-async function loadStockPrice(ticker, rangeKey) {
-  rangeKey = rangeKey || _activePriceRange;
-  _activePriceRange = rangeKey;
-
-  // Highlight active button
-  document.querySelectorAll('.price-range-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.range === rangeKey);
-  });
-
-  const priceSection = document.getElementById('price-chart-section');
-  const loadingEl    = document.getElementById('price-chart-loading');
-  const errorEl      = document.getElementById('price-chart-error');
-  priceSection.classList.remove('hidden');
-  loadingEl.classList.remove('hidden');
-  errorEl.classList.add('hidden');
-
-  const { interval, range } = PRICE_RANGES[rangeKey];
-  const points = await fetchYahooChart(ticker, interval, range);
-
-  loadingEl.classList.add('hidden');
-  if (!points || points.length === 0) {
-    errorEl.classList.remove('hidden');
+  if (typeof TradingView === 'undefined') {
+    container.innerHTML = '<div class="tv-chart-error">TradingView chart could not load. Check your internet connection.</div>';
     return;
   }
 
-  // Update price change pill
-  const first = points[0].v, last = points[points.length - 1].v;
-  const chgPct = ((last - first) / first) * 100;
-  const chgEl  = document.getElementById('price-change-pill');
-  chgEl.textContent = `${chgPct >= 0 ? '+' : ''}${chgPct.toFixed(2)}% (${rangeKey})`;
-  chgEl.className   = 'price-change-pill ' + (chgPct >= 0 ? 'positive' : 'negative');
-
-  makePriceLineChart('chart-price', points, rangeKey);
+  new TradingView.widget({
+    autosize:            true,
+    symbol:              nsekeTicker,
+    interval:            'D',
+    timezone:            'Africa/Nairobi',
+    theme:               'dark',
+    style:               '1',
+    locale:              'en',
+    toolbar_bg:          '#1e293b',
+    enable_publishing:   false,
+    withdateranges:      true,
+    hide_side_toolbar:   false,
+    allow_symbol_change: false,
+    save_image:          false,
+    container_id:        'tradingview_widget_inner',
+  });
 }
 
 // ---- Period Toggle ----
