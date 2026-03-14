@@ -1,39 +1,29 @@
 """
-extract_all.py — Comprehensive NSE PDF extractor.
+extract_all.py — NSE PDF extractor (rewritten for reliable CBK bank format parsing).
 
-Improvements over extract_financials_v2.py:
-  1. Parses period + period_end_date from PDF filename (not relying on index)
-  2. Adds NSE ticker mapping for all known companies
-  3. Adds period_type: annual / half_year / quarter
-  4. Handles Safaricom uppercase filenames
-  5. Scans ALL PDFs in data/nse/ year folders (2015–2025)
-  6. Safaricom unit normalisation: millions → thousands (×1000)
-  7. Outputs clean JSON with all fields the frontend needs
+Strategy:
+  - CBK bank disclosures: positional column extraction based on header date order
+  - Safaricom: keyword + positional extraction, units in millions
+  - Other companies: keyword-based extraction
 
-Usage (from backend/ with venv active):
-    python extract_all.py
-
-Outputs:
-  data/nse/financials.json   — extracted from PDFs
+Usage: python extract_all.py [--since YEAR] [company_filter ...]
+Output: data/nse/financials.json
 """
 
 from __future__ import annotations
-
-import json
-import re
-import sys
-from dataclasses import asdict, dataclass
+import json, re, sys
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
 import pdfplumber
 
 BACKEND_DIR = Path(__file__).parent
 DATA_ROOT   = BACKEND_DIR.parent / "data" / "nse"
 OUTPUT_FILE = DATA_ROOT / "financials.json"
 
-# ── ticker mapping ─────────────────────────────────────────────────────────────
+# ── Ticker / Sector mapping ───────────────────────────────────────────────────
+
 TICKER_MAP: Dict[str, str] = {
     "absa":                   "ABSA",
     "standard chartered":     "SCBK",
@@ -91,513 +81,531 @@ TICKER_MAP: Dict[str, str] = {
 }
 
 SECTOR_MAP: Dict[str, str] = {
-    "ABSA":  "Banking",
-    "SCBK":  "Banking",
-    "EQTY":  "Banking",
-    "KCB":   "Banking",
-    "NBK":   "Banking",
-    "NCBA":  "Banking",
-    "COOP":  "Banking",
-    "DTK":   "Banking",
-    "CFC":   "Banking",
-    "IMH":   "Banking",
-    "FANB":  "Banking",
-    "HFCK":  "Banking",
-    "SCOM":  "Telecoms",
-    "EABL":  "FMCG",
-    "BATK":  "FMCG",
-    "UNGA":  "FMCG",
-    "BAMB":  "Construction",
-    "EAPC":  "Construction",
-    "BRIT":  "Insurance",
-    "JUB":   "Insurance",
-    "SLAM":  "Insurance",
-    "NMG":   "Media",
-    "SGL":   "Media",
-    "SCAN":  "Media",
-    "KPLC":  "Energy",
-    "KEGN":  "Energy",
-    "SASN":  "Agriculture",
-    "WTK":   "Agriculture",
-    "KAPA":  "Agriculture",
-    "CARB":  "Manufacturing",
-    "BOC":   "Manufacturing",
-    "CPKL":  "Manufacturing",
-    "UMME":  "Energy",
-    "BKG":   "Banking",
-    "XPRS":  "Logistics",
-    "FTGH":  "Diversified",
-    "HAFR":  "Real Estate",
-    "HBZE":  "Entertainment",
-    "TCL":   "Infrastructure",
-    "TPSE":  "Hospitality",
-    "NSE":   "Financial Services",
+    "ABSA": "Banking", "SCBK": "Banking", "EQTY": "Banking", "KCB": "Banking",
+    "NBK": "Banking", "NCBA": "Banking", "COOP": "Banking", "DTK": "Banking",
+    "CFC": "Banking", "IMH": "Banking", "FANB": "Banking", "HFCK": "Banking",
+    "BKG": "Banking",
+    "SCOM": "Telecoms",
+    "EABL": "FMCG", "BATK": "FMCG", "UNGA": "FMCG",
+    "BAMB": "Construction", "EAPC": "Construction",
+    "BRIT": "Insurance", "JUB": "Insurance", "SLAM": "Insurance",
+    "NMG": "Media", "SGL": "Media", "SCAN": "Media",
+    "KPLC": "Energy", "KEGN": "Energy", "UMME": "Energy",
+    "SASN": "Agriculture", "WTK": "Agriculture", "KAPA": "Agriculture",
+    "CARB": "Manufacturing", "BOC": "Manufacturing", "CPKL": "Manufacturing",
+    "XPRS": "Logistics", "FTGH": "Diversified", "HAFR": "Real Estate",
+    "HBZE": "Entertainment", "TCL": "Infrastructure", "TPSE": "Hospitality",
+    "NSE": "Financial Services",
 }
+
+BANK_TICKERS = {"ABSA","SCBK","EQTY","KCB","NBK","NCBA","COOP","DTK","CFC","IMH","FANB","HFCK","BKG"}
 
 MONTH_MAP = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
-    "january": 1, "february": 2, "march": 3, "april": 4, "june": 6,
-    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+    "jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
+    "jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12,
+    "january":1,"february":2,"march":3,"april":4,"june":6,
+    "july":7,"august":8,"september":9,"october":10,"november":11,"december":12,
 }
 
+# ── Helpers ────────────────────────────────────────────────────────────────────
 
-def get_ticker(company_name: str) -> Optional[str]:
-    if not company_name:
-        return None
-    name_lower = company_name.lower()
+def get_ticker(name: str) -> Optional[str]:
+    if not name: return None
+    low = name.lower()
     for key, ticker in TICKER_MAP.items():
-        if key in name_lower:
+        if key in low:
             return ticker
     return None
-
 
 def get_ticker_from_filename(filename: str) -> Optional[str]:
-    fn_lower = filename.lower()
+    fn = filename.lower()
     for key, ticker in TICKER_MAP.items():
-        if key.replace(" ", "_") in fn_lower or key.replace(" ", "") in fn_lower:
+        if key.replace(" ", "_") in fn or key.replace(" ", "") in fn:
             return ticker
-        # try partial match
-        if key.split()[0] in fn_lower:
+        if key.split()[0] in fn:
             return ticker
     return None
 
-
 def parse_period_from_filename(filename: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    """
-    Extract (period_label, period_end_date_str, period_type) from filename.
-
-    e.g.
-      ABSA_Bank_Kenya_Plc_30_Jun_2024_financials.pdf
-        → ("H1 FY2024", "2024-06-30", "half_year")
-      ABSA_Bank_Kenya_Plc_31_Dec_2023_audited.pdf
-        → ("FY2023", "2023-12-31", "annual")
-      SAFARICOM_PLC_..._31_March_2024_...pdf
-        → ("FY2024", "2024-03-31", "annual")
-      KCB_Group_Plc_31_Mar_2024_audited.pdf
-        → ("FY2023", "2024-03-31", "annual")  ← March 31 = Safaricom FY end
-    """
-    # Pattern: _DD_MonthName_YYYY_ or _DD_Mon_YYYY_
-    date_pat = re.compile(
-        r'_(\d{1,2})_([A-Za-z]+)_(\d{4})',
-        re.IGNORECASE
-    )
-    m = date_pat.search(filename)
+    m = re.search(r'_(\d{1,2})_([A-Za-z]+)_(\d{4})', filename, re.I)
     if not m:
         return None, None, None
-
-    day   = int(m.group(1))
-    month_str = m.group(2).lower()
-    year  = int(m.group(3))
-
+    day, month_str, year = int(m.group(1)), m.group(2).lower(), int(m.group(3))
     month = MONTH_MAP.get(month_str)
     if not month:
         return None, None, None
-
     try:
         d = date(year, month, day)
     except ValueError:
         return None, None, None
-
     date_str = d.isoformat()
-
-    # Determine period label + type
-    # Annual: Dec 31 / Dec 30 → FY{year}
-    # Annual: Mar 31 → FY{year} for Safaricom (fiscal year Apr-Mar)
-    # Half year: Jun 30 → H1 FY{year} (for Dec FY) or H2 FY{year-1} for Mar FY
-    # Quarter: Mar 31, Jun 30, Sep 30 for calendar-year companies
     fn_lower = filename.lower()
-    is_safaricom = "safaricom" in fn_lower or "scom" in fn_lower
-
+    is_scom = "safaricom" in fn_lower or "scom" in fn_lower
     if month == 12 and day >= 30:
-        period_label = f"FY{year}"
-        period_type  = "annual"
-    elif month == 3 and day >= 31:
-        if is_safaricom:
-            period_label = f"FY{year}"
-            period_type  = "annual"
-        else:
-            # For banks with Dec year-end, March = Q1
-            period_label = f"Q1 FY{year}"
-            period_type  = "quarter"
-    elif month == 6 and day >= 30:
-        if is_safaricom:
-            period_label = f"H1 FY{year}"
-            period_type  = "half_year"
-        else:
-            period_label = f"H1 FY{year}"
-            period_type  = "half_year"
-    elif month == 9 and day >= 30:
-        period_label = f"Q3 FY{year}"
-        period_type  = "quarter"
-    elif month == 1 and day >= 31:
-        period_label = f"FY{year}"  # Some companies have Jan FY end
-        period_type  = "annual"
+        return f"FY{year}", date_str, "annual"
+    elif month == 3 and day >= 30:
+        if is_scom:
+            return f"FY{year}", date_str, "annual"
+        return f"Q1 FY{year}", date_str, "quarter"
+    elif month == 6 and day >= 29:
+        return f"H1 FY{year}", date_str, "half_year"
+    elif month == 9 and day >= 29:
+        return f"Q3 FY{year}", date_str, "quarter"
     elif month == 7 and day >= 31:
-        period_label = f"FY{year}"  # Some companies (Carbacid) have Jul FY end
-        period_type  = "annual"
+        return f"FY{year}", date_str, "annual"
     else:
-        # Generic fallback using month
-        period_label = f"{date_str}"
-        period_type  = "unknown"
-
-    return period_label, date_str, period_type
-
-
-# ── PDF extraction (reuse core logic from extract_financials_v2.py) ────────────
+        return date_str, date_str, "unknown"
 
 def extract_text(path: Path) -> str:
     chunks = []
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
             t = page.extract_text() or ""
-            if t:
+            if t.strip():
                 chunks.append(t)
     return "\n".join(chunks)
 
+# ── Number parsing utilities ──────────────────────────────────────────────────
 
-def _fix_doubled_token(token: str) -> str:
-    if not any(c.isdigit() for c in token):
-        return token
-    if len(token) < 4 or len(token) % 2 != 0:
-        return token
-    if all(token[i] == token[i + 1] for i in range(0, len(token), 2)):
-        return token[::2]
-    return token
+_NUM_PAT = re.compile(r"""
+    \([\d,]+(?:\.\d+)?\)    |   # parenthesised negative like (1,234)
+    -?[\d,]+\.\d+           |   # decimal number like 1,234.56 or -1.23
+    \d{1,3}(?:,\d{3})+      |   # comma-separated integer like 1,234,567
+    (?<![.\d])\d+(?![,.\d])      # plain integer (not part of decimal/comma num)
+""", re.VERBOSE)
 
+_DASH_TOKEN = re.compile(r'(?<!\w)-(?!\w)')  # standalone dash (not hyphenated word)
 
-def normalise_line(line: str) -> str:
-    line = line.replace("\u00a0", " ")
-    line = line.replace("\u2019", "'")
-    line = line.replace("\u2018", "'")
-    line = re.sub(r"(\d)\s+,(\d)", r"\1,\2", line)
-    line = re.sub(r"(?<!\d)(\d)\s+(\d{1,2},\d{3})", r"\1\2", line)
-    line = re.sub(r"(?<!\d)(\d)\s+(\d{1,2}\.\d+)", r"\1\2", line)
-    line = re.sub(r"(?<!\d)(\d)\s+\.(\d+)", r"\1.\2", line)
-    tokens = line.split()
-    tokens = [_fix_doubled_token(t) for t in tokens]
-    line = " ".join(tokens)
-    line = " ".join(line.split())
-    return line
+def parse_number(token: str) -> Optional[float]:
+    """Parse a single number token."""
+    token = token.strip()
+    if not token or token == '-':
+        return None
+    neg = False
+    if token.startswith('(') and token.endswith(')'):
+        neg = True
+        token = token[1:-1]
+    token = token.replace(',', '')
+    try:
+        v = float(token)
+        return -v if neg else v
+    except ValueError:
+        return None
 
-
-def get_lines(text: str) -> List[str]:
-    return [normalise_line(l) for l in text.splitlines() if l.strip()]
-
-
-_COMMA_NUM = re.compile(r"\b(\d{1,3}(?:,\d{3})+(?:\.\d+)?)\b")
-_PAREN_NUM = re.compile(r"\((\d[\d,]*(?:\.\d+)?)\)")
-_DECIMAL   = re.compile(r"\b(\d+\.\d+)\b")
-_ROW_REF   = re.compile(r"^\s*\d{1,2}(?:\.\d{1,2})?\s*\.?\s+")
-
-
-def _candidates(line: str) -> List[Tuple[float, int]]:
-    results: List[Tuple[float, int]] = []
-    for m in _PAREN_NUM.finditer(line):
-        try:
-            results.append((-float(m.group(1).replace(",", "")), m.start()))
-        except ValueError:
-            pass
-    for m in _COMMA_NUM.finditer(line):
-        try:
-            results.append((float(m.group(1).replace(",", "")), m.start()))
-        except ValueError:
-            pass
-    for m in _DECIMAL.finditer(line):
-        if not any(abs(pos - m.start()) < 5 for _, pos in results):
-            try:
-                results.append((float(m.group(1)), m.start()))
-            except ValueError:
-                pass
-    results.sort(key=lambda x: x[1])
+def extract_all_numbers(line: str) -> List[Optional[float]]:
+    """Extract all data column values from a line, preserving position.
+    Returns numbers and None for dashes."""
+    results = []
+    # We need to parse in order: find numbers and standalone dashes
+    # First, strip the row label (everything before the first number or dash)
+    # Find the position of the first number-like token
+    first_num = _NUM_PAT.search(line)
+    if not first_num:
+        return results
+    
+    data_part = line[first_num.start():]
+    
+    # Tokenize: split by whitespace, classify each token
+    tokens = data_part.split()
+    for t in tokens:
+        if t == '-':
+            results.append(None)
+        else:
+            v = parse_number(t)
+            if v is not None:
+                results.append(v)
+            # else: skip non-numeric tokens (like "Kshs", labels mixed in)
     return results
 
+def extract_numbers_only(line: str) -> List[float]:
+    """Extract only actual numbers (skip dashes/None)."""
+    return [v for v in extract_all_numbers(line) if v is not None]
 
-def parse_value(line: str, want_ratio: bool = False) -> Optional[float]:
+# ── CBK Bank Format Parser ────────────────────────────────────────────────────
+
+def detect_cbk_format(text: str) -> bool:
+    """Detect if text is in CBK banking disclosure format."""
+    low = text[:2000].lower()
+    return ("statement of financial position" in low and 
+            ("kshs 000" in low or "shs '000" in low or "shs 000" in low or "kes 000" in low))
+
+def detect_header_date_order(text: str) -> Tuple[int, int]:
+    """Detect the date ordering in header.
+    Returns (curr_idx, num_cols_per_entity).
+    curr_idx: 0 if descending (newer first), 1 if ascending (older first).
+    """
+    # Look at first ~15 lines for date patterns
+    lines = text.split('\n')[:15]
+    for line in lines:
+        # Find all 4-digit years in the line
+        years = re.findall(r'20[12]\d', line)
+        if len(years) >= 2:
+            y1, y2 = int(years[0]), int(years[1])
+            if y1 > y2:
+                return 0, len(years)  # descending: current year first
+            elif y1 < y2:
+                return 1, len(years)  # ascending: current year second
+            else:
+                # Same year — look at months
+                # e.g. "31-Mar-24 31-Dec-23" within same year
+                continue
+    
+    # Fallback: check for specific date patterns
+    for line in lines:
+        dates = re.findall(r'(\d{1,2})-([A-Za-z]+)-(\d{2,4})', line)
+        if len(dates) >= 2:
+            y1 = int(dates[0][2])
+            y2 = int(dates[1][2])
+            if y1 < 100: y1 += 2000
+            if y2 < 100: y2 += 2000
+            if y1 > y2:
+                return 0, len(dates)
+            elif y1 < y2:
+                return 1, len(dates)
+    
+    return 0, 4  # default: descending, 4 columns
+
+def find_cbk_section(lines: List[str], section_marker: str) -> int:
+    """Find the line index where a section starts."""
+    marker_low = section_marker.lower()
+    for i, line in enumerate(lines):
+        if marker_low in line.lower():
+            return i
+    return -1
+
+def cbk_find_row(lines: List[str], start: int, end: int, 
+                  keywords: List[str], exclude: List[str] = None) -> Optional[str]:
+    """Find a row by keywords within a line range."""
+    exclude = [e.lower() for e in (exclude or [])]
+    for i in range(max(0, start), min(end, len(lines))):
+        low = lines[i].lower()
+        if any(k.lower() in low for k in keywords):
+            if not any(e in low for e in exclude):
+                return lines[i]
+    return None
+
+def cbk_find_numbered_row(lines: List[str], start: int, end: int, row_num: int) -> Optional[str]:
+    """Find a row by its CBK row number (e.g., row 12 = PAT)."""
+    patterns = [f"{row_num}.", f"{row_num} "]
+    for i in range(max(0, start), min(end, len(lines))):
+        stripped = lines[i].strip()
+        for p in patterns:
+            if stripped.startswith(p):
+                # Verify it has numbers
+                nums = extract_numbers_only(lines[i])
+                if nums:
+                    return lines[i]
+    return None
+
+def cbk_get_value(line: Optional[str], curr_idx: int, is_ratio: bool = False) -> Optional[float]:
+    """Extract the current-year value from a CBK row at the correct column position."""
     if not line:
         return None
-    stripped = _ROW_REF.sub("", line)
-    hits = _candidates(stripped)
-    if not hits:
+    
+    all_vals = extract_all_numbers(line)
+    if not all_vals:
         return None
-    if not want_ratio:
-        large = [(v, p) for v, p in hits if abs(v) >= 1000 or v != int(v)]
-        if large:
-            return large[0][0]
-        return hits[0][0]
-    else:
-        return hits[0][0]
-
-
-def find_line(lines: List[str], *patterns: str) -> Optional[str]:
-    pats = [p.lower() for p in patterns]
-    for line in lines:
-        low = line.lower()
-        if any(p in low for p in pats):
-            return line
+    
+    # For rows with dashes, all_vals includes None entries
+    if curr_idx < len(all_vals):
+        val = all_vals[curr_idx]
+        if val is not None:
+            return val
+    
+    # Fallback: just get the first non-None value
+    for v in all_vals:
+        if v is not None:
+            return v
     return None
 
+def cbk_get_value_safe(line: Optional[str], curr_idx: int, 
+                        is_ratio: bool = False, min_threshold: float = 500) -> Optional[float]:
+    """Get value with footnote reference filtering."""
+    val = cbk_get_value(line, curr_idx, is_ratio)
+    if val is None:
+        return None
+    if not is_ratio and abs(val) < min_threshold:
+        return None  # likely a footnote reference
+    return val
 
-def _keyword_before_first_large_number(line: str, pattern: str) -> bool:
-    """
-    Return True if *pattern* appears BEFORE the first large (≥1000) number in *line*.
-    This filters out lines where the pattern is in narrative text after tabular data.
-    e.g.  "1.5 Total interest income 48,591,544 ...  Profit after tax grew..." → False (narrative)
-          "12 Profit after tax and exceptional items 13,797,373 ..." → True (label row)
-    """
-    stripped = _ROW_REF.sub("", line)
-    low = stripped.lower()
-    pat_pos = low.find(pattern.lower())
-    if pat_pos < 0:
-        return False
-    # Find the position of the first large number in the stripped line
-    for m in _COMMA_NUM.finditer(stripped):
-        try:
-            val = float(m.group(1).replace(",", ""))
-        except ValueError:
-            continue
-        if abs(val) >= 1000:
-            return pat_pos < m.start()
-    # No large number found — the pattern is the label by default
-    return True
-
-
-def find_line_excluding(lines: List[str], pattern: str, *excludes: str) -> Optional[str]:
-    excl = [e.lower() for e in excludes]
-    # First pass: prefer lines where pattern is a ROW LABEL (before numbers) AND has large value
-    for line in lines:
-        low = line.lower()
-        if pattern.lower() in low and not any(e in low for e in excl):
-            v = parse_value(line)
-            if v is not None and abs(v) >= 1000 and _keyword_before_first_large_number(line, pattern):
-                return line
-    # Second pass: any matching line with a large number (relax position check)
-    for line in lines:
-        low = line.lower()
-        if pattern.lower() in low and not any(e in low for e in excl):
-            v = parse_value(line)
-            if v is not None and abs(v) >= 1000:
-                return line
-    # Third pass: any matching line with any numeric value
-    for line in lines:
-        low = line.lower()
-        if pattern.lower() in low and not any(e in low for e in excl):
-            if parse_value(line) is not None:
-                return line
-    # Fourth pass: any matching line as fallback
-    for line in lines:
-        low = line.lower()
-        if pattern.lower() in low and not any(e in low for e in excl):
-            return line
-    return None
-
-
-def detect_units(text: str) -> str:
-    t = text.lower()
-    # "Kes 000" or "Ksh 000" → explicitly thousands (multi-period NSE table format)
-    if re.search(r"\bkes\s+000\b", t) or re.search(r"\bksh\s+000\b", t):
-        return "KES_thousands"
-    # Millions check — handle "KShs Millions", "KES Millions", etc.
-    if ("kes millions" in t or "ksh millions" in t or "kshs millions" in t
-            or "in millions" in t
-            or "ksh mn" in t or "kshs mn" in t or "ksh. mn" in t or "kshs. mn" in t):
-        return "KES_millions"
-    # Billions check — handle "KShs Bn" phrase AND inline "KShs <number>Bn" patterns
-    if ("kes billions" in t or "ksh billions" in t or "in billions" in t
-            or "kshs bn" in t or "ksh bn" in t or "kes bn" in t
-            or "kshs. bn" in t or "ksh. bn" in t
-            or re.search(r"kshs?\s+[\d,.]+bn\b", t) is not None):
-        return "KES_billions"
-    if "thousands" in t:
-        return "KES_thousands"
-    return "KES_thousands"
-
-
-def units_to_thousands_multiplier(units: str) -> float:
-    """Return multiplier to convert to KES thousands."""
-    if units == "KES_millions":
-        return 1000.0
-    if units == "KES_billions":
-        return 1_000_000.0
-    return 1.0  # already in thousands
-
-
-def extract_bank_metrics(lines):
-    def val(line, ratio=False):
-        return parse_value(line, want_ratio=ratio) if line else None
-
-    nii_line = find_line(lines, "net interest income")
-    inc_line = find_line(lines, "total operating income", "total income")
-    opex_line = find_line(lines, "other operating expenses", "operating expenses")
-    pbt_line = find_line_excluding(lines, "profit before tax", "deferred", "income tax expense")
-    if pbt_line is None:
-        pbt_line = find_line_excluding(lines, "profit before taxation", "deferred")
-    # Try most-specific patterns first; "profit for the year" is last (can appear in equity statements)
-    pat_line = find_line_excluding(lines, "profit after tax", "retained", "balance at", "total equity",
-                                   "loans and advances", "advances to customers")
-    if pat_line is None:
-        # KCB / DTK style: "Profit/(loss) after tax and exceptional items"
-        pat_line = find_line_excluding(lines, "profit/(loss) after tax", "retained", "balance",
-                                       "total equity", "loans and advances")
-    if pat_line is None:
-        pat_line = find_line_excluding(lines, "profit after exceptional items", "retained")
-    if pat_line is None:
-        pat_line = find_line_excluding(lines, "net profit for the period", "retained")
-    if pat_line is None:
-        pat_line = find_line_excluding(lines, "profit for the period", "retained", "balance", "total equity",
-                                       "loans and advances", "advances to customers")
-    if pat_line is None:
-        # Last resort — can appear in equity section, so exclude those
-        pat_line = find_line_excluding(lines, "profit for the year", "retained", "balance", "total equity",
-                                       "loans and advances", "advances to customers",
-                                       "at 1 january", "at 31 december", "at 1 april")
-    eps_line = find_line(lines, "earnings per share", "basic eps")
-    dps_line = find_line(lines, "dividend per share", "dividends per share")
-    assets_line = find_line(lines, "total assets", "total asset")
-    equity_line = find_line_excluding(lines, "total shareholders' funds", "minimum", "excess", "deficiency")
-    if equity_line is None:
-        equity_line = find_line_excluding(lines, "total shareholders funds", "minimum")
-    if equity_line is None:
-        equity_line = find_line_excluding(lines, "total equity", "minimum")
-    if equity_line is None:
-        for candidate in lines:
-            if "shareholder" in candidate.lower():
-                v = parse_value(candidate)
-                if v is not None and abs(v) >= 1000:
-                    equity_line = candidate
-                    break
-    deposits_line = find_line(lines, "customer deposits")
-    loans_line = find_line_excluding(lines, "loans and advances to customers", "non-performing", "non performing", "insider", "fees", "provision")
-    if loans_line is None:
-        loans_line = find_line_excluding(lines, "loans and advances", "non-performing", "non performing", "insider", "fees", "provision", "contingent")
-    if loans_line is None:
-        loans_line = find_line(lines, "net loans", "advances to customers")
-
-    dps_raw = val(dps_line, ratio=True)
-    dps = dps_raw if (dps_raw is None or abs(dps_raw) < 100) else None
-
+def extract_cbk_bank(text: str, filename: str) -> Dict[str, Any]:
+    """Extract financials from CBK banking disclosure format."""
+    curr_idx, total_cols = detect_header_date_order(text)
+    lines = text.split('\n')
+    
+    # Find key sections
+    bs_start = find_cbk_section(lines, "STATEMENT OF FINANCIAL POSITION")
+    if bs_start < 0:
+        bs_start = find_cbk_section(lines, "statement of financial position")
+    
+    is_start = find_cbk_section(lines, "STATEMENT OF COMPREHENSIVE INCOME")
+    if is_start < 0:
+        is_start = find_cbk_section(lines, "statement of comprehensive income")
+    
+    disc_start = find_cbk_section(lines, "OTHER DISCLOSURES")
+    if disc_start < 0:
+        disc_start = find_cbk_section(lines, "other disclosures")
+    if disc_start < 0:
+        disc_start = len(lines)
+    
+    bs_end = is_start if is_start > 0 else disc_start
+    is_end = disc_start if disc_start > is_start else len(lines)
+    
+    # Balance sheet items
+    assets_line = cbk_find_row(lines, bs_start, bs_end, ["TOTAL ASSETS", "Total assets"])
+    deposits_line = cbk_find_row(lines, bs_start, bs_end, 
+                                  ["Customer deposits", "Customers' deposits", "Customer Deposits"])
+    loans_line = cbk_find_row(lines, bs_start, bs_end, 
+                               ["Loans and advances to customers", "loans and advances to customers"],
+                               exclude=["Non-performing", "Insider", "provision"])
+    equity_line = cbk_find_row(lines, bs_start, bs_end, 
+                                ["TOTAL SHAREHOLDERS", "Total shareholders", "total shareholders"])
+    
+    # Income statement items  
+    nii_line = cbk_find_row(lines, is_start, is_end, 
+                             ["NET INTEREST INCOME", "Net interest income"])
+    revenue_line = cbk_find_row(lines, is_start, is_end, 
+                                 ["TOTAL OPERATING INCOME", "Total operating income"])
+    
+    # PBT: try row 7 by keyword first, then by number
+    pbt_line = cbk_find_row(lines, is_start, is_end, 
+                             ["Profit before tax", "PROFIT BEFORE TAX"],
+                             exclude=["deferred"])
+    if not pbt_line:
+        pbt_line = cbk_find_numbered_row(lines, is_start, is_end, 7)
+    
+    # PAT: try keyword first
+    pat_line = cbk_find_row(lines, is_start, is_end, 
+                             ["Profit after tax", "PROFIT AFTER TAX"],
+                             exclude=["retained", "balance", "total equity", "minority"])
+    if not pat_line:
+        # Row 12 in CBK format = PAT (often unlabelled)
+        pat_line = cbk_find_numbered_row(lines, is_start, is_end, 12)
+    
+    # EPS and DPS
+    eps_line = cbk_find_row(lines, is_start, is_end + 20, 
+                             ["EARNINGS PER SHARE", "Earnings per share", "Basic earnings per share"])
+    dps_line = cbk_find_row(lines, is_start, is_end + 20, 
+                             ["DIVIDEND PER SHARE", "Dividends per share", "Dividend per share"])
+    
+    # Extract values
+    total_assets = cbk_get_value_safe(assets_line, curr_idx)
+    deposits = cbk_get_value_safe(deposits_line, curr_idx)
+    loans = cbk_get_value_safe(loans_line, curr_idx)
+    equity = cbk_get_value_safe(equity_line, curr_idx)
+    nii = cbk_get_value_safe(nii_line, curr_idx)
+    revenue = cbk_get_value_safe(revenue_line, curr_idx)
+    pbt = cbk_get_value_safe(pbt_line, curr_idx)
+    pat = cbk_get_value_safe(pat_line, curr_idx)
+    eps = cbk_get_value(eps_line, curr_idx, is_ratio=True)
+    dps = cbk_get_value(dps_line, curr_idx, is_ratio=True)
+    
+    # Validate EPS/DPS are reasonable (< 100)
+    if eps is not None and abs(eps) > 500:
+        eps = None
+    if dps is not None and abs(dps) > 500:
+        dps = None
+    
     return {
-        "net_interest_income": val(nii_line),
-        "revenue":             val(inc_line),
-        "operating_expenses":  val(opex_line),
-        "profit_before_tax":   val(pbt_line),
-        "profit_after_tax":    val(pat_line),
-        "basic_eps":           val(eps_line, ratio=True),
-        "dividend_per_share":  dps,
-        "total_assets":        val(assets_line),
-        "total_equity":        val(equity_line),
-        "customer_deposits":   val(deposits_line),
-        "loans_and_advances":  val(loans_line),
+        "net_interest_income": nii,
+        "revenue": revenue,
+        "profit_before_tax": pbt,
+        "profit_after_tax": pat,
+        "basic_eps": eps,
+        "dividend_per_share": dps,
+        "total_assets": total_assets,
+        "total_equity": equity,
+        "customer_deposits": deposits,
+        "loans_and_advances": loans,
         "operating_cash_flow": None,
-        "capex":               None,
-        "ebitda":              None,
-        "mpesa_revenue":       None,
+        "capex": None,
+        "ebitda": None,
+        "mpesa_revenue": None,
     }
 
+# ── Safaricom Parser ──────────────────────────────────────────────────────────
 
-def extract_telco_metrics(lines):
-    def val(line, ratio=False):
-        return parse_value(line, want_ratio=ratio) if line else None
-
-    rev_line = find_line(lines, "service revenue", "total revenue", "revenue")
-    ebitda_line = find_line(lines, "ebitda")
-    opex_line = find_line(lines, "operating profit", "profit from operations", "ebit")
-    pbt_line = find_line(lines, "profit before tax", "profit before income tax")
-    pat_line = find_line_excluding(lines, "profit after tax", "retained")
-    if pat_line is None:
-        pat_line = find_line_excluding(lines, "profit for the year", "retained", "balance")
-    eps_line = find_line(lines, "basic", "earnings per share", "eps")
-    dps_line = find_line(lines, "dividend per share", "dividends per share", "proposed dividend per share")
-    assets_line = find_line(lines, "total assets")
-    equity_line = find_line(lines, "total equity", "shareholders' equity", "shareholders equity")
-    mpesa_line = find_line(lines, "m-pesa revenue", "mpesa revenue", "mobile money revenue")
-    ocf_line = find_line(lines, "net cash from operating", "net cash generated from operating", "cash generated from operations")
-    capex_line = find_line(lines, "capital expenditure", "capex", "purchase of property", "purchase of plant")
-
-    dps_raw = val(dps_line, ratio=True)
-    dps = dps_raw if (dps_raw is None or abs(dps_raw) < 100) else None
-
+def extract_safaricom(text: str, filename: str) -> Dict[str, Any]:
+    """Extract Safaricom financials. Units in KShs Mn → multiply by 1000."""
+    curr_idx, _ = detect_header_date_order(text)
+    lines = text.split('\n')
+    
+    def find_and_get(keywords, exclude=None, is_ratio=False):
+        exclude = [e.lower() for e in (exclude or [])]
+        for line in lines:
+            low = line.lower()
+            if any(k.lower() in low for k in keywords):
+                if any(e in low for e in exclude):
+                    continue
+                nums = extract_numbers_only(line)
+                if nums and curr_idx < len(nums):
+                    return nums[curr_idx]
+                elif nums:
+                    return nums[0]
+        return None
+    
+    mult = 1000.0  # millions → thousands
+    
+    total_rev = find_and_get(["Total revenue"])
+    service_rev = find_and_get(["Service revenue"])
+    revenue = total_rev or service_rev
+    
+    ebitda = find_and_get(["EBITDA"])
+    # EBITDA line might be split: "Amortisation (EBITDA)" or "163,292.6 139,862.4"
+    # Look for the line after "Earnings Before Interest"
+    if ebitda is None:
+        for i, line in enumerate(lines):
+            if "earnings before interest" in line.lower():
+                # EBITDA value might be on next line
+                if i + 1 < len(lines):
+                    nums = extract_numbers_only(lines[i + 1])
+                    if nums and curr_idx < len(nums):
+                        ebitda = nums[curr_idx]
+                    elif nums:
+                        ebitda = nums[0]
+                # Or on the same line
+                if ebitda is None:
+                    nums = extract_numbers_only(line)
+                    if nums and curr_idx < len(nums):
+                        ebitda = nums[curr_idx]
+                break
+    
+    pbt = find_and_get(["Profit before income tax", "Profit before tax"])
+    
+    # PAT: "Profit after tax" (group level, before split to equity holders)
+    pat = find_and_get(["Profit after tax"], exclude=["attributable", "retained"])
+    # Or use "Attributable to Equity holders of the parent"
+    pat_equity = find_and_get(["Equity holders of the parent", "equity holders of the parent"])
+    
+    eps_val = find_and_get(["Basic earnings per share", "Earnings per share"], is_ratio=True)
+    dps_val = find_and_get(["Dividend per share", "Dividends per share"], is_ratio=True)
+    assets = find_and_get(["Total assets"])
+    equity = find_and_get(["Total equity", "Total shareholders"])
+    mpesa = find_and_get(["M-PESA revenue", "M-Pesa revenue", "MPESA revenue"])
+    ocf = find_and_get(["Net cash generated from operating", "Net cash from operating"])
+    
+    def scale(v):
+        return round(v * mult) if v is not None else None
+    
+    # For EPS/DPS don't scale - they're per share
     return {
         "net_interest_income": None,
-        "revenue":             val(rev_line),
-        "operating_expenses":  val(opex_line),
-        "profit_before_tax":   val(pbt_line),
-        "profit_after_tax":    val(pat_line),
-        "basic_eps":           val(eps_line, ratio=True),
-        "dividend_per_share":  dps,
-        "total_assets":        val(assets_line),
-        "total_equity":        val(equity_line),
-        "customer_deposits":   None,
-        "loans_and_advances":  None,
-        "operating_cash_flow": val(ocf_line),
-        "capex":               val(capex_line),
-        "ebitda":              val(ebitda_line),
-        "mpesa_revenue":       val(mpesa_line),
+        "revenue": scale(revenue),
+        "profit_before_tax": scale(pbt),
+        "profit_after_tax": scale(pat or pat_equity),
+        "basic_eps": eps_val,
+        "dividend_per_share": dps_val,
+        "total_assets": scale(assets),
+        "total_equity": scale(equity),
+        "customer_deposits": None,
+        "loans_and_advances": None,
+        "operating_cash_flow": scale(ocf),
+        "capex": None,
+        "ebitda": scale(ebitda),
+        "mpesa_revenue": scale(mpesa),
     }
 
+# ── Generic (non-bank, non-telco) Parser ──────────────────────────────────────
 
-def extract_generic_metrics(lines):
-    def val(line, ratio=False):
-        return parse_value(line, want_ratio=ratio) if line else None
+def detect_units(text: str) -> Tuple[str, float]:
+    """Detect units and return (unit_label, multiplier_to_thousands)."""
+    t = text[:3000].lower()
+    if re.search(r"\bkes\s+000\b", t) or re.search(r"\bksh\s+000\b", t) or "shs '000" in t or "shs 000" in t:
+        return "KES_thousands", 1.0
+    if any(x in t for x in ["kes millions", "ksh millions", "kshs millions", "in millions",
+                              "ksh mn", "kshs mn", "kshs. mn", "kshs mn"]):
+        return "KES_millions", 1000.0
+    if any(x in t for x in ["kes billions", "ksh billions", "in billions",
+                              "kshs bn", "ksh bn"]):
+        return "KES_billions", 1_000_000.0
+    if "thousands" in t:
+        return "KES_thousands", 1.0
+    return "KES_thousands", 1.0
 
-    pat_line = find_line_excluding(lines, "profit after tax", "retained", "balance", "total equity")
-    if pat_line is None:
-        pat_line = find_line_excluding(lines, "profit for the year", "retained", "balance")
-    if pat_line is None:
-        pat_line = find_line_excluding(lines, "profit for the period", "retained", "balance")
-
+def extract_generic(text: str, filename: str) -> Dict[str, Any]:
+    """Extract financials from generic income statement format."""
+    lines = text.split('\n')
+    _, mult = detect_units(text)
+    
+    # Detect date order
+    curr_idx = 0
+    for line in lines[:20]:
+        years = re.findall(r'20[12]\d', line)
+        if len(years) >= 2:
+            if int(years[0]) < int(years[1]):
+                curr_idx = 1
+            break
+    
+    def find_val(keywords, exclude=None, is_ratio=False):
+        exclude = [e.lower() for e in (exclude or [])]
+        for line in lines:
+            low = line.lower()
+            if any(k.lower() in low for k in keywords):
+                if any(e in low for e in exclude):
+                    continue
+                nums = extract_numbers_only(line)
+                if not nums:
+                    continue
+                idx = min(curr_idx, len(nums) - 1)
+                val = nums[idx]
+                if not is_ratio and abs(val) < 500 and mult == 1.0:
+                    continue  # skip footnote ref
+                return val
+        return None
+    
+    def scale(v):
+        return round(v * mult) if v is not None else None
+    
+    revenue = find_val(["Total revenue", "Revenue", "Turnover", "Total income", 
+                         "Total operating income", "Service revenue"])
+    pat = find_val(["Profit after tax", "Profit for the year", "Profit for the period",
+                     "Net profit"], 
+                    exclude=["retained", "balance", "total equity"])
+    pbt = find_val(["Profit before tax", "Profit before income tax"],
+                    exclude=["deferred"])
+    eps = find_val(["Earnings per share", "Basic earnings per share", "Basic eps"], is_ratio=True)
+    dps = find_val(["Dividend per share", "Dividends per share"], is_ratio=True)
+    assets = find_val(["Total assets"])
+    equity = find_val(["Total equity", "Total shareholders", "Shareholders' equity"])
+    ebitda = find_val(["EBITDA"])
+    
     return {
         "net_interest_income": None,
-        "revenue":             val(find_line(lines, "revenue", "turnover", "total income", "total operating income")),
-        "operating_expenses":  val(find_line(lines, "operating expenses")),
-        "profit_before_tax":   val(find_line_excluding(lines, "profit before tax", "deferred")),
-        "profit_after_tax":    val(pat_line),
-        "basic_eps":           val(find_line(lines, "earnings per share", "basic eps"), ratio=True),
-        "dividend_per_share":  val(find_line(lines, "dividend per share"), ratio=True),
-        "total_assets":        val(find_line(lines, "total assets")),
-        "total_equity":        val(find_line(lines, "total equity", "shareholders")),
-        "customer_deposits":   None,
-        "loans_and_advances":  None,
-        "operating_cash_flow": val(find_line(lines, "net cash from operating")),
-        "capex":               val(find_line(lines, "capital expenditure", "purchase of property")),
-        "ebitda":              val(find_line(lines, "ebitda")),
-        "mpesa_revenue":       None,
+        "revenue": scale(revenue),
+        "profit_before_tax": scale(pbt),
+        "profit_after_tax": scale(pat),
+        "basic_eps": eps,
+        "dividend_per_share": dps,
+        "total_assets": scale(assets),
+        "total_equity": scale(equity),
+        "customer_deposits": None,
+        "loans_and_advances": None,
+        "operating_cash_flow": None,
+        "capex": None,
+        "ebitda": scale(ebitda),
+        "mpesa_revenue": None,
     }
 
+# ── Main processing ───────────────────────────────────────────────────────────
 
-BANK_KEYWORDS = ["absa", "standard chartered", "stanchart", "equity bank", "equity group",
-    "kcb", "cooperative bank", "co-op bank", "diamond trust", "dtb", "ncba", "stanbic",
-    "family bank", "im bank", "i&m", "hf group", "national bank", "bank"]
-TELCO_KEYWORDS = ["safaricom", "telkom", "airtel"]
-
-
-def classify_company(name: str, filename: str, text_snippet: str) -> str:
-    probe = " ".join(filter(None, [name, filename, text_snippet[:500]])).lower()
-    if any(k in probe for k in TELCO_KEYWORDS):
+def classify_company(ticker: Optional[str], filename: str, text: str) -> str:
+    if ticker in BANK_TICKERS:
+        return "bank"
+    probe = (filename + " " + text[:500]).lower()
+    if "safaricom" in probe:
         return "telco"
-    if any(k in probe for k in BANK_KEYWORDS):
+    if any(k in probe for k in ["bank", "stanchart", "stanbic"]):
         return "bank"
     return "generic"
 
-
 def extract_company_name(filename: str, index_company: Optional[str]) -> str:
-    """Best-effort company name from filename."""
     if index_company:
         return index_company
-
-    # Strip date and suffix from filename
     name = Path(filename).stem
-    # Remove date pattern (e.g. _30_Jun_2024)
     name = re.sub(r'_\d{1,2}_[A-Za-z]+_\d{4}.*', '', name)
-    # Convert underscores to spaces
-    name = name.replace('_', ' ').strip()
-    return name
-
-
-# ── main scan ──────────────────────────────────────────────────────────────────
+    return name.replace('_', ' ').strip()
 
 def scan_all_pdfs(min_year: int = 0) -> List[Path]:
-    """Find all PDF files in data/nse/ year subfolders. Optional min_year filter."""
     pdfs = []
     for year_dir in sorted(DATA_ROOT.iterdir()):
         if year_dir.is_dir() and year_dir.name.isdigit():
@@ -606,9 +614,7 @@ def scan_all_pdfs(min_year: int = 0) -> List[Path]:
             pdfs.extend(sorted(year_dir.glob("*.pdf")))
     return pdfs
 
-
 def load_index_company_map() -> Dict[str, Dict]:
-    """Build a map from local_path → index entry for quick lookup."""
     index_file = DATA_ROOT / "index_2023_2025.json"
     if not index_file.exists():
         return {}
@@ -621,72 +627,53 @@ def load_index_company_map() -> Dict[str, Dict]:
             result[Path(item["local_path"]).name] = item
     return result
 
-
 def process_pdf(pdf_path: Path, index_entry: Optional[Dict]) -> Optional[Dict]:
     filename = pdf_path.name
     company_name = extract_company_name(filename, index_entry.get("company") if index_entry else None)
     ticker = get_ticker(company_name) or get_ticker_from_filename(filename)
-
+    
     period_label, period_end_date, period_type = parse_period_from_filename(filename)
-    # If index has period info, prefer it
     if index_entry and index_entry.get("period"):
         period_label = index_entry["period"]
-
+    
     try:
         text = extract_text(pdf_path)
     except Exception as e:
         print(f"  ✗ {filename}: {e}", file=sys.stderr)
         return None
-
-    lines = get_lines(text)
-    snippet = text[:1000]
-
-    company_type = classify_company(company_name, filename, snippet)
-    units = detect_units(text)
-    mult = units_to_thousands_multiplier(units)
-
-    if company_type == "bank":
-        metrics = extract_bank_metrics(lines)
+    
+    if not text or len(text.strip()) < 100:
+        print(f"  ⚠ {filename}: empty/scanned PDF, skipping")
+        return None
+    
+    company_type = classify_company(ticker, filename, text)
+    
+    # Extract based on company type
+    if company_type == "bank" and detect_cbk_format(text):
+        metrics = extract_cbk_bank(text, filename)
     elif company_type == "telco":
-        metrics = extract_telco_metrics(lines)
+        metrics = extract_safaricom(text, filename)
     else:
-        metrics = extract_generic_metrics(lines)
-
-    # Apply unit multiplier to convert everything to KES thousands
-    financial_fields = [
-        "net_interest_income", "revenue", "operating_expenses",
-        "profit_before_tax", "profit_after_tax", "total_assets",
-        "total_equity", "customer_deposits", "loans_and_advances",
-        "operating_cash_flow", "capex", "ebitda", "mpesa_revenue",
-    ]
-    if mult != 1.0:
-        for field in financial_fields:
-            if metrics[field] is not None:
-                metrics[field] = round(metrics[field] * mult)
-
-    # Try to infer year from filename if we have a period
-    year = int(period_end_date[:4]) if period_end_date else (index_entry.get("year") if index_entry else None)
-
+        metrics = extract_generic(text, filename)
+    
+    year = int(period_end_date[:4]) if period_end_date else None
+    
     return {
-        "company":             company_name,
-        "ticker":              ticker,
-        "sector":              SECTOR_MAP.get(ticker, "Other") if ticker else "Other",
-        "period":              period_label,
-        "period_end_date":     period_end_date,
-        "period_type":         period_type,
-        "year":                year,
-        "units_source":        units,
-        "source_file":         filename,
-        "url":                 index_entry.get("url", "") if index_entry else "",
+        "company": company_name,
+        "ticker": ticker,
+        "sector": SECTOR_MAP.get(ticker, "Other") if ticker else "Other",
+        "period": period_label,
+        "period_end_date": period_end_date,
+        "period_type": period_type,
+        "year": year,
+        "source_file": filename,
+        "url": index_entry.get("url", "") if index_entry else "",
         **metrics,
     }
 
-
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
-
-    # CLI args: optional company names and/or --since YEAR
-    # e.g.  python extract_all.py absa safaricom --since 2020
+    
     raw_args = sys.argv[1:]
     min_year = 0
     company_filters = []
@@ -698,51 +685,59 @@ def main():
         else:
             company_filters.append(raw_args[i].lower())
             i += 1
-
+    
     if min_year:
         print(f"Filtering to years >= {min_year}")
     if company_filters:
         print(f"Filtering to companies: {company_filters}")
-
+    
     pdfs = scan_all_pdfs(min_year=min_year)
     if company_filters:
         pdfs = [p for p in pdfs if any(f in p.name.lower() for f in company_filters)]
     print(f"Processing {len(pdfs)} PDF files.")
-
+    
     index_map = load_index_company_map()
     print(f"Index has {len(index_map)} entries for cross-referencing.")
-
+    
     results = []
-    errors  = 0
-
+    errors = 0
+    
     for i, pdf_path in enumerate(pdfs, 1):
         filename = pdf_path.name
         index_entry = index_map.get(filename)
-        print(f"[{i}/{len(pdfs)}] {filename[:60]}")
-
+        print(f"[{i}/{len(pdfs)}] {filename[:70]}")
+        
         entry = process_pdf(pdf_path, index_entry)
         if entry:
             results.append(entry)
         else:
             errors += 1
-
+    
+    # Merge if filtered
+    if company_filters and OUTPUT_FILE.exists():
+        with OUTPUT_FILE.open(encoding="utf-8") as f:
+            existing = json.load(f)
+        new_tickers = {r.get("ticker") for r in results}
+        kept = [r for r in existing if r.get("ticker") not in new_tickers]
+        results = kept + results
+        print(f"Merged: kept {len(kept)} existing + {len(results) - len(kept)} new")
+    
     print(f"\n✓ Extracted: {len(results)}  Errors: {errors}")
     print(f"Writing to {OUTPUT_FILE}")
-
+    
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT_FILE.open("w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
-
-    # Summary by company
+    
+    # Summary
     companies: Dict[str, int] = {}
     for r in results:
-        c = r.get("ticker") or r.get("company", "?")
+        c = r.get("ticker") or r.get("company") or "?"
         companies[c] = companies.get(c, 0) + 1
     print("\nCompany summary:")
-    for c, count in sorted(companies.items()):
+    for c, count in sorted(companies.items(), key=lambda x: x[0] or ""):
         print(f"  {c}: {count} periods")
     print("\n✓ Done")
-
 
 if __name__ == "__main__":
     main()

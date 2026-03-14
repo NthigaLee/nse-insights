@@ -5,6 +5,160 @@
 
 const NSE_COMPANIES = {
 
+  ABSA: {
+    name: "ABSA Bank Kenya PLC",
+    ticker: "ABSA",
+    exchange: "NSE",
+    sector: "Banking",
+    logo: "\ud83c\udfe6",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 14.2,
+    annuals: [
+      {"year": 2023, "period": "Dec2023", "periodType": "annual", "dateKey": "2023-12-31", "revenue": 44555765.0, "pat": 30681559.0, "pbt": 19832431.0, "nii": 32131322.0, "eps": 2.83, "dps": 1.55, "totalAssets": 477290548.0, "totalEquity": 60811301.0, "deposits": 306662590.0, "loans": 283578543.0, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
+    ],
+  },
+
+  BOC: {
+    name: "BOC Kenya PLC",
+    ticker: "BOC",
+    exchange: "NSE",
+    sector: "Manufacturing",
+    logo: "\ud83c\udfed",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 95.0,
+    annuals: [
+      {"year": 2023, "period": "Dec2023", "periodType": "annual", "dateKey": "2023-12-31", "revenue": 1539342.0, "pat": 198058.0, "pbt": 309081.0, "nii": null, "eps": 10.14, "dps": null, "totalAssets": 39366.0, "totalEquity": 1807496.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
+    ],
+  },
+
+  BRIT: {
+    name: "Britam Holdings PLC",
+    ticker: "BRIT",
+    exchange: "NSE",
+    sector: "Insurance",
+    logo: "\ud83c\udfe2",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 6.0,
+    latestPeriod: {"year": 2024, "period": "Q2 2024", "periodType": "half_year", "dateKey": "2024-06-30", "revenue": 17807972.0, "pat": 2012920.0, "pbt": 13271323.0, "nii": null, "eps": 0.8, "dps": null, "totalAssets": 188823941.0, "totalEquity": 26595507.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null},
+    annuals: [
+      {"year": 2023, "period": "Dec2023", "periodType": "annual", "dateKey": "2023-12-31", "revenue": 36436197.0, "pat": 3279119.0, "pbt": 4819495.0, "nii": null, "eps": null, "dps": null, "totalAssets": 174393970.0, "totalEquity": 25688397.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
+      {"year": 2024, "period": "Q2 2024", "periodType": "half_year", "dateKey": "2024-06-30", "revenue": 17807972.0, "pat": 2012920.0, "pbt": 13271323.0, "nii": null, "eps": 0.8, "dps": null, "totalAssets": 188823941.0, "totalEquity": 26595507.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+  },
+
+  CARB: {
+    name: "Carbacid Investments PLC",
+    ticker: "CARB",
+    exchange: "NSE",
+    sector: "Manufacturing",
+    logo: "\ud83c\udfed",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 12.0,
+    annuals: [
+      {"year": 2024, "period": "Jul2024", "periodType": "annual", "dateKey": "2024-07-31", "revenue": 2066315.0, "pat": 354492.0, "pbt": 1123758.0, "nii": null, "eps": 3.2, "dps": null, "totalAssets": null, "totalEquity": null, "deposits": null, "loans": null, "ebitda": null, "mpesa": null},
+      {"year": 2025, "period": "Jul2025", "periodType": "annual", "dateKey": "2025-07-31", "revenue": 2099850.0, "pat": 1002914.0, "pbt": 1288564.0, "nii": null, "eps": 3.94, "dps": null, "totalAssets": null, "totalEquity": 6033183.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
+    ],
+  },
+
+  COOP: {
+    name: "Co-operative Bank of Kenya",
+    ticker: "COOP",
+    exchange: "NSE",
+    sector: "Banking",
+    logo: "\ud83c\udfe6",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 14.5,
+    annuals: [
+      {"year": 2024, "period": "Dec2024", "periodType": "annual", "dateKey": "2024-12-31", "revenue": 18849176.0, "pat": 4437152.0, "pbt": 5648173.0, "nii": null, "eps": 0.79, "dps": 0.15, "totalAssets": 113516.0, "totalEquity": 235324.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
+    ],
+  },
+
+  EABL: {
+    name: "East African Breweries Ltd",
+    ticker: "EABL",
+    exchange: "NSE",
+    sector: "FMCG",
+    logo: "\ud83c\udf7a",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 155.0,
+    latestPeriod: {"year": 2024, "period": "Q2 2024", "periodType": "half_year", "dateKey": "2024-06-30", "revenue": 124131.0, "pat": 10870.0, "pbt": 16771.0, "nii": null, "eps": 10.3, "dps": null, "totalAssets": null, "totalEquity": null, "deposits": null, "loans": null, "ebitda": null, "mpesa": null},
+    annuals: [
+      {"year": 2023, "period": "Dec2023", "periodType": "annual", "dateKey": "2023-12-31", "revenue": 66540.0, "pat": 6780.0, "pbt": 10095.0, "nii": null, "eps": 13.8, "dps": null, "totalAssets": null, "totalEquity": 38692.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
+      {"year": 2024, "period": "Q2 2024", "periodType": "half_year", "dateKey": "2024-06-30", "revenue": 124131.0, "pat": 10870.0, "pbt": 16771.0, "nii": null, "eps": 10.3, "dps": null, "totalAssets": null, "totalEquity": null, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+  },
+
+  EQTY: {
+    name: "Equity Group Holdings PLC",
+    ticker: "EQTY",
+    exchange: "NSE",
+    sector: "Banking",
+    logo: "\ud83c\udfe6",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 52.0,
+    latestPeriod: {"year": 2025, "period": "Q3 2025", "periodType": "quarter", "dateKey": "2025-09-30", "revenue": 65849444.0, "pat": null, "pbt": null, "nii": 42043892.0, "eps": null, "dps": null, "totalAssets": 985388288.0, "totalEquity": 126070494.0, "deposits": 607951110.0, "loans": 423197110.0, "ebitda": null, "mpesa": null},
+    annuals: [
+      {"year": 2023, "period": "Dec2023", "periodType": "annual", "dateKey": "2023-12-31", "revenue": 93774197.0, "pat": null, "pbt": null, "nii": 58411267.0, "eps": null, "dps": null, "totalAssets": 1004243929.0, "totalEquity": 100766641.0, "deposits": 517217504.0, "loans": null, "ebitda": null, "mpesa": null},
+      {"year": 2024, "period": "Dec2024", "periodType": "annual", "dateKey": "2024-12-31", "revenue": 89271509.0, "pat": null, "pbt": null, "nii": 57214481.0, "eps": null, "dps": null, "totalAssets": 1027679730.0, "totalEquity": 123102110.0, "deposits": 609677691.0, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
+      {"year": 2025, "period": "Q3 2025", "periodType": "quarter", "dateKey": "2025-09-30", "revenue": 65849444.0, "pat": null, "pbt": null, "nii": 42043892.0, "eps": null, "dps": null, "totalAssets": 985388288.0, "totalEquity": 126070494.0, "deposits": 607951110.0, "loans": 423197110.0, "ebitda": null, "mpesa": null}
+    ],
+  },
+
+  SCOM: {
+    name: "Safaricom PLC",
+    ticker: "SCOM",
+    exchange: "NSE",
+    sector: "Telecoms",
+    logo: "\ud83d\udce1",
+    currency: "KES",
+    units: "millions",
+    latestPrice: 15.85,
+    latestPeriod: {"year": 2024, "period": "Q3 2024", "periodType": "quarter", "dateKey": "2024-09-30", "revenue": 189421.9, "pat": 10012.1, "pbt": 33859.2, "nii": null, "eps": 0.7, "dps": null, "totalAssets": 483124.4, "totalEquity": 189672.9, "deposits": null, "loans": null, "ebitda": 75070.7, "mpesa": null},
+    annuals: [
+      {"year": 2024, "period": "Mar2024", "periodType": "annual", "dateKey": "2024-03-31", "revenue": 349447.2, "pat": 42658.4, "pbt": 84687.4, "nii": null, "eps": 1.57, "dps": null, "totalAssets": 641164.3, "totalEquity": 335747.9, "deposits": null, "loans": null, "ebitda": -12776.5, "mpesa": null}
+    ],
+    quarters: [
+      {"year": 2024, "period": "Q3 2024", "periodType": "quarter", "dateKey": "2024-09-30", "revenue": 189421.9, "pat": 10012.1, "pbt": 33859.2, "nii": null, "eps": 0.7, "dps": null, "totalAssets": 483124.4, "totalEquity": 189672.9, "deposits": null, "loans": null, "ebitda": 75070.7, "mpesa": null}
+    ],
+  },
+
+  JUB: {
+    name: "Jubilee Holdings Limited",
+    ticker: "JUB",
+    exchange: "NSE",
+    sector: "Insurance",
+    logo: "\ud83c\udfe2",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 230.0,
+    annuals: [
+      {"year": 2024, "period": "Dec2024", "periodType": "annual", "dateKey": "2024-12-31", "revenue": 25676005.0, "pat": 4721821.0, "pbt": 6224690.0, "nii": null, "eps": 65.0, "dps": null, "totalAssets": 213577754.0, "totalEquity": 51182318.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
+    ],
+  },
+
   KCB: {
     name: "KCB Group PLC",
     ticker: "KCB",
@@ -16,17 +170,64 @@ const NSE_COMPANIES = {
     latestPrice: 42.0,
     latestPeriod: {"year": 2025, "period": "Q3 2025", "periodType": "quarter", "dateKey": "2025-09-30", "revenue": 98811027.0, "pat": null, "pbt": null, "nii": 72146888.0, "eps": null, "dps": null, "totalAssets": 1404190326.0, "totalEquity": 210325777.0, "deposits": 1062960998.0, "loans": 850344983.0, "ebitda": null, "mpesa": null},
     annuals: [
-      {"year": 2020, "period": "Dec2020", "periodType": "annual", "dateKey": "2020-12-31", "revenue": 75842577.0, "pat": 18346857.0, "pbt": 25589.0, "nii": 53470863.0, "eps": 0.34, "dps": 0.17, "totalAssets": 758345431.0, "totalEquity": 111270544.0, "deposits": 588627915.0, "loans": 492537561.0, "ebitda": null, "mpesa": null},
       {"year": 2023, "period": "Dec2023", "periodType": "annual", "dateKey": "2023-12-31", "revenue": 98100692.0, "pat": 25410014.0, "pbt": 33252179.0, "nii": 64774792.0, "eps": 0.47, "dps": 0.58, "totalAssets": 1425369827.0, "totalEquity": 138717804.0, "deposits": 1116875397.0, "loans": 740241723.0, "ebitda": null, "mpesa": null},
       {"year": 2024, "period": "Dec2024", "periodType": "annual", "dateKey": "2024-12-31", "revenue": 126653268.0, "pat": 45029313.0, "pbt": 58375497.0, "nii": 88856198.0, "eps": 0.83, "dps": 0.24, "totalAssets": 1277766539.0, "totalEquity": 183715437.0, "deposits": 971960594.0, "loans": 736614026.0, "ebitda": null, "mpesa": null}
     ],
     quarters: [
       {"year": 2024, "period": "Q1 2024", "periodType": "quarter", "dateKey": "2024-03-31", "revenue": 30750467.0, "pat": 11169312.0, "pbt": 14619526.0, "nii": 20506602.0, "eps": 0.83, "dps": null, "totalAssets": 1327838470.0, "totalEquity": 151141853.0, "deposits": 997078186.0, "loans": 698236955.0, "ebitda": null, "mpesa": null},
-      {"year": 2024, "period": "Q2 2024", "periodType": "half_year", "dateKey": "2024-06-30", "revenue": 59454682.0, "pat": 21223377.0, "pbt": 27247302.0, "nii": 39882688.0, "eps": 0.79, "dps": 0.12, "totalAssets": 1296698247.0, "totalEquity": 158799444.0, "deposits": 978413046.0, "loans": 710046556.0, "ebitda": null, "mpesa": null},
-      {"year": 2024, "period": "Q3 2024", "periodType": "quarter", "dateKey": "2024-09-30", "revenue": 88572537.0, "pat": null, "pbt": null, "nii": 59849018.0, "eps": null, "dps": null, "totalAssets": 1325023040.0, "totalEquity": 164429835.0, "deposits": 1033725604.0, "loans": 726954611.0, "ebitda": null, "mpesa": null},
       {"year": 2025, "period": "Q1 2025", "periodType": "quarter", "dateKey": "2025-03-31", "revenue": 31526092.0, "pat": 11067572.0, "pbt": 14517952.0, "nii": 22448350.0, "eps": 0.82, "dps": 0.24, "totalAssets": 1329508593.0, "totalEquity": 195390252.0, "deposits": 1007061773.0, "loans": 760298000.0, "ebitda": null, "mpesa": null},
-      {"year": 2025, "period": "Q2 2025", "periodType": "half_year", "dateKey": "2025-06-30", "revenue": 64286686.0, "pat": 22874591.0, "pbt": 28400754.0, "nii": 46703444.0, "eps": 0.85, "dps": 0.12, "totalAssets": 1351345471.0, "totalEquity": 206119370.0, "deposits": 1031466777.0, "loans": 808894832.0, "ebitda": null, "mpesa": null},
       {"year": 2025, "period": "Q3 2025", "periodType": "quarter", "dateKey": "2025-09-30", "revenue": 98811027.0, "pat": null, "pbt": null, "nii": 72146888.0, "eps": null, "dps": null, "totalAssets": 1404190326.0, "totalEquity": 210325777.0, "deposits": 1062960998.0, "loans": 850344983.0, "ebitda": null, "mpesa": null}
+    ],
+  },
+
+  NMG: {
+    name: "Nation Media Group",
+    ticker: "NMG",
+    exchange: "NSE",
+    sector: "Media",
+    logo: "\ud83d\udcf0",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 14.0,
+    latestPeriod: {"year": 2024, "period": "Q2 2024", "periodType": "half_year", "dateKey": "2024-06-30", "revenue": 3175.0, "pat": null, "pbt": null, "nii": null, "eps": null, "dps": null, "totalAssets": null, "totalEquity": 7195.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null},
+    annuals: [
+      {"year": 2023, "period": "Dec2023", "periodType": "annual", "dateKey": "2023-12-31", "revenue": 7116.0, "pat": null, "pbt": null, "nii": null, "eps": null, "dps": null, "totalAssets": null, "totalEquity": 7862.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
+      {"year": 2024, "period": "Q2 2024", "periodType": "half_year", "dateKey": "2024-06-30", "revenue": 3175.0, "pat": null, "pbt": null, "nii": null, "eps": null, "dps": null, "totalAssets": null, "totalEquity": 7195.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+  },
+
+  SCBK: {
+    name: "Standard Chartered Bank Kenya",
+    ticker: "SCBK",
+    exchange: "NSE",
+    sector: "Banking",
+    logo: "\ud83c\udfe6",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 195.0,
+    annuals: [
+      {"year": 2023, "period": "Dec2023", "periodType": "annual", "dateKey": "2023-12-31", "revenue": 33977048.0, "pat": 12057935.0, "pbt": 19668482.0, "nii": null, "eps": 3.0, "dps": 2.0, "totalAssets": 428962175.0, "totalEquity": 61532267.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null},
+      {"year": 2024, "period": "Dec2024", "periodType": "annual", "dateKey": "2024-12-31", "revenue": 41728586.0, "pat": 3835467.0, "pbt": 28208236.0, "nii": null, "eps": 3.0, "dps": 2.0, "totalAssets": 384574089.0, "totalEquity": 71776120.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
+    ],
+  },
+
+  UNGA: {
+    name: "Unga Group Limited",
+    ticker: "UNGA",
+    exchange: "NSE",
+    sector: "Agriculture",
+    logo: "\ud83c\udf3e",
+    currency: "KES",
+    units: "thousands",
+    latestPrice: 26.0,
+    annuals: [
+      {"year": 2023, "period": "Dec2023", "periodType": "annual", "dateKey": "2023-12-31", "revenue": 12426424.0, "pat": null, "pbt": null, "nii": null, "eps": null, "dps": null, "totalAssets": 10900009.0, "totalEquity": 10900009.0, "deposits": null, "loans": null, "ebitda": null, "mpesa": null}
+    ],
+    quarters: [
     ],
   }
 
