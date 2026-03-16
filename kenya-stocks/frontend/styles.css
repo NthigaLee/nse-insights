@@ -253,20 +253,7 @@ select optgroup {
   background-color: #e2e8f0;
 }
 
-/* TradingView Live Price Chart */
-.tv-chart-section {
-  max-width: 1200px;
-  margin: 0 auto 1.5rem;
-  padding: 0 1.5rem;
-}
-.tv-chart-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
+/* TradingView fallback link (secondary option below self-hosted chart) */
 .tv-open-link {
   font-size: 0.78rem;
   font-weight: 600;
@@ -278,36 +265,6 @@ select optgroup {
   transition: all 0.15s;
 }
 .tv-open-link:hover { background: #1e293b; color: #7dd3fc; }
-.tv-chart-container {
-  height: 420px;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 12px;
-  overflow: hidden;
-}
-.tv-chart-container.tv-chart-full { height: 560px; }
-.tv-chart-error {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #f59e0b;
-  font-size: 0.85rem;
-}
-/* "Live on chart" badge in company header */
-.company-price.tv-live-badge {
-  font-size: 1rem;
-  color: #38bdf8;
-  background: rgba(56,189,248,0.1);
-  border: 1px solid rgba(56,189,248,0.25);
-  padding: 0.35rem 0.9rem;
-  border-radius: 8px;
-  letter-spacing: 0.01em;
-}
-
-@media (max-width: 768px) {
-  .tv-chart-container { height: 280px; }
-}
 
 /* No Financial Data Notice */
 .no-data-notice {
@@ -399,4 +356,5 @@ select optgroup {
   .company-header { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
   .company-price-block { text-align: left; }
   .topnav-right { display: none; }
+  #price-chart-wrap { height: 240px !important; }
 }

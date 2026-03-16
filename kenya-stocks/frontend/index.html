@@ -6,7 +6,6 @@
   <title>NSE Insights</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
 
@@ -53,21 +52,34 @@
       </div>
     </div>
 
-    <!-- TradingView Live Price Chart -->
-    <div id="tv-chart-section" class="tv-chart-section hidden">
-      <div class="tv-chart-header">
+    <!-- Self-Hosted NSE Price Chart (Wanjawa Mendeley 2013–2025) -->
+    <div id="price-chart-section" class="price-chart-section hidden">
+      <div class="price-chart-header">
         <span class="chart-section-label">Share Price</span>
-        <a id="tv-open-link" href="https://www.tradingview.com" target="_blank" rel="noopener" class="tv-open-link">Open on TradingView ↗</a>
+        <div class="price-range-group">
+          <button class="price-range-btn active" data-range="max">Max</button>
+          <button class="price-range-btn" data-range="1y">1Y</button>
+          <button class="price-range-btn" data-range="1m">1M</button>
+          <button class="price-range-btn" data-range="1w">1W</button>
+          <button class="price-range-btn" data-range="1d">1D</button>
+        </div>
+        <span id="price-change-pill" class="price-change-pill hidden"></span>
       </div>
-      <div id="tradingview-chart-container" class="tv-chart-container">
-        <!-- TradingView widget renders here -->
+      <div class="price-chart-card">
+        <div id="price-chart-status" class="price-chart-loading">Loading price data…</div>
+        <div id="price-chart-wrap" class="chart-wrap" style="height:380px;display:none;">
+          <canvas id="price-chart"></canvas>
+        </div>
+      </div>
+      <div style="margin-top:0.5rem;text-align:right;">
+        <a id="tv-open-link" href="https://www.tradingview.com" target="_blank" rel="noopener" class="tv-open-link">Open on TradingView ↗</a>
       </div>
     </div>
 
     <!-- No Financial Data Notice (shown for price-only stocks) -->
     <div id="no-data-notice" class="no-data-notice hidden">
       <span class="no-data-icon">📊</span>
-      <span id="no-data-text">Financial statements for this company are not yet available. Price chart powered by TradingView.</span>
+      <span id="no-data-text">Financial statements for this company are not yet available.</span>
     </div>
 
     <!-- Financial Content (hidden for price-only stocks) -->

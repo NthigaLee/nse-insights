@@ -33,11 +33,6 @@ const FINANCIAL_TICKERS = new Set(
   Object.keys(NSE_COMPANIES).map(internal => INTERNAL_TO_TV[internal] || internal)
 );
 
-// Get TradingView NSEKE symbol from TV ticker
-function getTVSymbol(tvTicker) {
-  return `NSEKE:${tvTicker}`;
-}
-
 // ---- Chart.js Global Defaults ----
 Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = '#2a3146';
@@ -222,26 +217,11 @@ function loadCompany() {
     co ? `${tvTicker} | ${co.exchange} · ${co.sector}` : `NSE:${tvTicker} · NSE Kenya`;
 
   const priceEl = document.getElementById('company-price');
-  const hasTVChart = !NO_TV_TICKER.has(internalTicker);
-  if (hasTVChart) {
-    priceEl.textContent = 'Live on chart ↓';
-    priceEl.classList.add('tv-live-badge');
-  } else {
-    priceEl.textContent = co && co.latestPrice ? `KES ${co.latestPrice.toFixed(2)}` : '—';
-    priceEl.classList.remove('tv-live-badge');
-  }
+  priceEl.textContent = co && co.latestPrice ? `KES ${co.latestPrice.toFixed(2)}` : '—';
+  priceEl.classList.remove('tv-live-badge');
 
-  // -- TradingView Live Price Chart --
-  // Skip for companies with no NSEKE ticker (FMLY, HBZE, TCL)
-  if (hasTVChart) {
-    initTradingViewChart(tvTicker, !hasFinancials);
-  } else {
-    const section   = document.getElementById('tv-chart-section');
-    const container = document.getElementById('tradingview-chart-container');
-    section.classList.remove('hidden');
-    container.classList.remove('tv-chart-full');
-    container.innerHTML = '<div class="tv-chart-error" style="padding:24px;text-align:center;color:#64748b;font-size:13px;">Live price chart not available for this stock on TradingView (NSEKE)</div>';
-  }
+  // -- Self-Hosted Price Chart (Wanjawa Mendeley 2013–2025) --
+  loadPriceChart(tvTicker);
 
   if (hasFinancials && co) {
     // Reset period toggle
@@ -265,13 +245,13 @@ function loadCompany() {
   } else {
     // Price-only stock
     document.getElementById('company-eps-pill').textContent = '';
-    document.getElementById('company-latest-year').textContent = 'Live price shown in chart below';
+    document.getElementById('company-latest-year').textContent = 'Price chart shown below';
 
     // Hide financial sections, show notice
     document.getElementById('financial-content').classList.add('hidden');
     document.getElementById('no-data-notice').classList.remove('hidden');
     document.getElementById('no-data-text').textContent =
-      `📊 Financial statements for ${companyName} are not yet available. Price chart powered by TradingView.`;
+      `📊 Financial statements for ${companyName} are not yet available.`;
   }
 }
 
@@ -458,45 +438,170 @@ function renderCharts(co, period) {
   }], chartOpts);
 }
 
-// ---- TradingView Live Price Chart ----
-function initTradingViewChart(ticker, fullHeight) {
-  const nsekeTicker = getTVSymbol(ticker);
+// ---- Self-Hosted Price Chart (Wanjawa Mendeley 2013–2025) ----
+let priceChartInstance = null;
+let _allPrices = null;
+let _currentRange = 'max';
 
-  const section   = document.getElementById('tv-chart-section');
-  const container = document.getElementById('tradingview-chart-container');
-  const link      = document.getElementById('tv-open-link');
+function filterByRange(prices, range) {
+  if (range === 'max') return prices;
+  const end = new Date(prices[prices.length - 1].date);
+  let start;
+  switch (range) {
+    case '1y': start = new Date(end); start.setFullYear(end.getFullYear() - 1); break;
+    case '1m': start = new Date(end); start.setMonth(end.getMonth() - 1); break;
+    case '1w': start = new Date(end); start.setDate(end.getDate() - 7); break;
+    case '1d': start = new Date(end); start.setDate(end.getDate() - 1); break;
+    default: return prices;
+  }
+  return prices.filter(p => new Date(p.date) >= start);
+}
 
-  section.classList.remove('hidden');
-  container.classList.toggle('tv-chart-full', !!fullHeight);
+function renderPriceChart(prices) {
+  const filtered = filterByRange(prices, _currentRange);
+  const labels = filtered.map(p => p.date);
+  const data   = filtered.map(p => p.close);
 
-  if (link) {
-    link.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(nsekeTicker)}`;
+  // Price change pill
+  const pillEl = document.getElementById('price-change-pill');
+  if (filtered.length >= 2) {
+    const first = filtered[0].close;
+    const last  = filtered[filtered.length - 1].close;
+    const chg   = ((last - first) / first) * 100;
+    const sign  = chg >= 0 ? '+' : '';
+    pillEl.textContent = `${sign}${chg.toFixed(2)}%`;
+    pillEl.className = `price-change-pill ${chg >= 0 ? 'positive' : 'negative'}`;
+    pillEl.classList.remove('hidden');
+  } else {
+    pillEl.classList.add('hidden');
   }
 
-  // Re-create inner div to force widget reset when switching companies
-  container.innerHTML = '<div id="tradingview_widget_inner" style="height:100%"></div>';
+  const wrap   = document.getElementById('price-chart-wrap');
+  const canvas = document.getElementById('price-chart');
+  wrap.style.display = 'block';
 
-  if (typeof TradingView === 'undefined') {
-    container.innerHTML = '<div class="tv-chart-error">TradingView chart could not load. Check your internet connection.</div>';
-    return;
+  if (priceChartInstance) {
+    priceChartInstance.destroy();
   }
 
-  new TradingView.widget({
-    autosize:            true,
-    symbol:              nsekeTicker,
-    interval:            'D',
-    timezone:            'Africa/Nairobi',
-    theme:               'dark',
-    style:               '1',
-    locale:              'en',
-    toolbar_bg:          '#1e293b',
-    enable_publishing:   false,
-    withdateranges:      true,
-    hide_side_toolbar:   false,
-    allow_symbol_change: false,
-    save_image:          false,
-    container_id:        'tradingview_widget_inner',
+  priceChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Close (KES)',
+        data,
+        borderColor: '#38bdf8',
+        backgroundColor: 'rgba(56, 189, 248, 0.07)',
+        borderWidth: 1.5,
+        fill: true,
+        pointRadius: 0,
+        tension: 0.1,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          borderColor: '#334155',
+          borderWidth: 1,
+          padding: 10,
+          titleFont: { size: 12, weight: 'bold' },
+          bodyFont: { size: 12 },
+          cornerRadius: 8,
+          callbacks: {
+            label: (item) => ` KES ${item.raw.toFixed(2)}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
+        },
+        y: {
+          grid: { color: 'rgba(51, 65, 85, 0.5)', drawTicks: false },
+          border: { display: false },
+          ticks: {
+            color: '#64748b',
+            font: { size: 10 },
+            callback: v => 'KES ' + v.toFixed(2),
+          },
+        },
+      },
+    },
   });
+}
+
+async function loadPriceChart(tvTicker) {
+  const section = document.getElementById('price-chart-section');
+  const status  = document.getElementById('price-chart-status');
+  const wrap    = document.getElementById('price-chart-wrap');
+  const pillEl  = document.getElementById('price-change-pill');
+  const tvLink  = document.getElementById('tv-open-link');
+
+  // Show section
+  section.classList.remove('hidden');
+
+  // Reset UI state
+  status.textContent = 'Loading price data…';
+  status.className   = 'price-chart-loading';
+  status.style.display = 'block';
+  wrap.style.display = 'none';
+  pillEl.classList.add('hidden');
+
+  if (priceChartInstance) {
+    priceChartInstance.destroy();
+    priceChartInstance = null;
+  }
+  _allPrices    = null;
+  _currentRange = 'max';
+
+  // Reset active range button to Max
+  document.querySelectorAll('.price-range-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.range === 'max');
+  });
+
+  // TradingView fallback link
+  const internalTick = TV_TO_INTERNAL[tvTicker] || tvTicker;
+  if (tvLink) {
+    if (!NO_TV_TICKER.has(internalTick)) {
+      tvLink.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSEKE:' + tvTicker)}`;
+      tvLink.style.display = '';
+    } else {
+      tvLink.style.display = 'none';
+    }
+  }
+
+  // Fetch price data (tvTicker == Mendeley Stock Code for all NSE stocks)
+  try {
+    const resp = await fetch(`data/prices/${tvTicker}.json`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const priceData = await resp.json();
+    if (!priceData.prices || priceData.prices.length === 0) throw new Error('Empty dataset');
+
+    _allPrices = priceData.prices;
+    status.style.display = 'none';
+    renderPriceChart(_allPrices);
+  } catch (_e) {
+    status.textContent  = 'Price history not available for this stock.';
+    status.className    = 'price-chart-error';
+    wrap.style.display  = 'none';
+    pillEl.classList.add('hidden');
+  }
+}
+
+function setPriceRange(range) {
+  if (!_allPrices) return;
+  _currentRange = range;
+  document.querySelectorAll('.price-range-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.range === range);
+  });
+  renderPriceChart(_allPrices);
 }
 
 // ---- Period Toggle (annual / quarterly) ----
@@ -561,10 +666,13 @@ function populateDropdown() {
   sel.appendChild(priceOnlyGrp);
 }
 
-// ---- Enter key on select ----
+// ---- Enter key on select + range button wiring ----
 document.addEventListener('DOMContentLoaded', () => {
   populateDropdown();
   document.getElementById('company-select').addEventListener('keydown', e => {
     if (e.key === 'Enter') loadCompany();
+  });
+  document.querySelectorAll('.price-range-btn').forEach(btn => {
+    btn.addEventListener('click', () => setPriceRange(btn.dataset.range));
   });
 });
