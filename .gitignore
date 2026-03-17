@@ -1,6 +1,18 @@
-backend/venv/
-backend/__pycache__/
-**/__pycache__/
+# Python
+__pycache__/
 *.pyc
 *.pyo
-.DS_Store
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Temp/debug files
+*.log
+extract_output.txt
+extract_log.txt
+
+# Claude internal
+.claude/
