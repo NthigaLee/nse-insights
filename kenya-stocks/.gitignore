@@ -1,0 +1,12 @@
+claude_work/
+*.pyc
+__pycache__/
+data/nse/2023/
+data/nse/2024/
+data/nse/2025/
+data/nse/2026/
+backend/err.txt
+backend/output.txt
+test_out.txt
+test_output.txt
+backend/venv/
