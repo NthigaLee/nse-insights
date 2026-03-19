@@ -1513,8 +1513,25 @@ function toggleTheme() {
   const btn = document.getElementById('theme-toggle');
   if (btn) btn.textContent = isLight ? '🌙' : '☀️';
   try { localStorage.setItem('nse-theme', isLight ? 'light' : 'dark'); } catch(e) {}
-  // Re-render charts to pick up new colors
-  if (activeCompany) loadCompany();
+
+  // Update chart colors without losing company context
+  if (activeCompany) {
+    const ticker = activeCompany.ticker;
+    // Destroy and recreate charts with new theme colors
+    Object.keys(chartInstances).forEach(key => {
+      if (chartInstances[key]) {
+        chartInstances[key].destroy();
+        delete chartInstances[key];
+      }
+    });
+    // Re-render only the charts, not the full company load
+    renderPriceChart(ticker, _currentRange || '1Y');
+    if (_currentPeriod === 'annual') {
+      renderCompanyCharts(activeCompany, 'annual');
+    } else {
+      renderCompanyCharts(activeCompany, 'quarterly');
+    }
+  }
 }
 
 function initTheme() {
