@@ -749,6 +749,7 @@ function loadCompany() {
 
   document.getElementById('dashboard').classList.remove('hidden');
   document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('market-summary').classList.add('hidden'); // Hide market summary when company is selected
   const infoRow = document.getElementById('info-row');
   if (infoRow) infoRow.classList.remove('hidden');
   document.getElementById('sector-overview').classList.add('hidden');
@@ -1333,18 +1334,22 @@ function showView(view) {
   const dashboard = document.getElementById('dashboard');
   const emptyState = document.getElementById('empty-state');
   const sectorOverview = document.getElementById('sector-overview');
+  const marketSummary = document.getElementById('market-summary');
 
   if (view === 'sectors') {
     dashboard.classList.add('hidden');
     emptyState.classList.add('hidden');
+    if (marketSummary) marketSummary.classList.add('hidden');
     sectorOverview.classList.remove('hidden');
     renderSectorOverview();
   } else {
     sectorOverview.classList.add('hidden');
     if (activeCompany) {
       dashboard.classList.remove('hidden');
+      if (marketSummary) marketSummary.classList.add('hidden'); // Hide when company is selected
     } else {
       emptyState.classList.remove('hidden');
+      if (marketSummary) marketSummary.classList.remove('hidden'); // Show market summary on empty state
     }
   }
 }
