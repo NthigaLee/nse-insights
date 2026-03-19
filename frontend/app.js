@@ -340,8 +340,8 @@ function sectorEmoji(sector) {
 }
 
 // ---- Chart.js Global Defaults ----
-Chart.defaults.color = '#8896a8';
-Chart.defaults.borderColor = '#1e2d3d';
+Chart.defaults.color = '#707070';
+Chart.defaults.borderColor = 'rgba(0,230,118,0.08)';
 Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
 Chart.defaults.font.size = 11;
 
@@ -349,11 +349,15 @@ Chart.defaults.font.size = 11;
 function fmtNum(val, units) {
   if (val === null || val === undefined || isNaN(val)) return '\u2014';
   if (units === 'thousands') {
+    // Raw values are in KES thousands, so 1e6 = 1B KES, 1e9 = 1T KES
+    if (Math.abs(val) >= 1e9) return (val / 1e9).toFixed(1) + 'T';
     if (Math.abs(val) >= 1e6) return (val / 1e6).toFixed(1) + 'B';
-    if (Math.abs(val) >= 1e3) return (val / 1e3).toFixed(1) + 'M';
-    return val.toFixed(0);
+    if (Math.abs(val) >= 1e3) return (val / 1e3).toFixed(0) + 'M';
+    return val.toFixed(0) + 'K';
   }
   if (units === 'millions') {
+    // Raw values are in KES millions, so 1e3 = 1B KES, 1e6 = 1T KES
+    if (Math.abs(val) >= 1e6) return (val / 1e6).toFixed(1) + 'T';
     if (Math.abs(val) >= 1e3) return (val / 1e3).toFixed(1) + 'B';
     return val.toFixed(0) + 'M';
   }
@@ -403,7 +407,7 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
         legend: { display: false },
         tooltip: {
           backgroundColor: '#111111',
-          borderColor: 'rgba(0,230,118,0.12)',
+          borderColor: 'rgba(255,255,255,0.05)',
           borderWidth: 1,
           padding: 12,
           titleFont: { size: 12, weight: 'bold' },
@@ -419,25 +423,32 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
         }
       },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#707070', font: { size: 10, weight: 500 } } },
+        x: { grid: { display: false }, ticks: { color: '#5a6a7e', font: { size: 10, weight: 500 } } },
         y: {
-          grid: { color: 'rgba(255, 255, 255, 0.04)', drawTicks: false },
+          grid: { color: 'rgba(30, 45, 61, 0.6)', drawTicks: false },
           border: { display: false },
           ticks: {
-            color: '#707070', font: { size: 10 },
+            color: '#5a6a7e', font: { size: 10 },
             callback: (v) => {
               const u = opts.units;
+              if (opts.isCurrency) {
+                // EPS/DPS — raw KES per share, no unit conversion
+                return 'KES ' + v.toFixed(v >= 100 ? 0 : 2);
+              }
+              if (u === 'thousands') {
+                // Values in KES thousands: 1e6 = 1B, 1e9 = 1T
+                if (Math.abs(v) >= 1e9) return (v / 1e9).toFixed(0) + 'T';
+                if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(0) + 'B';
+                if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(0) + "M";
+                return v + 'K';
+              }
               if (u === 'millions') {
+                // Values in KES millions: 1e3 = 1B, 1e6 = 1T
                 if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(0) + 'T';
                 if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(0) + 'B';
                 return v.toFixed(0) + 'M';
               }
-              if (u === 'thousands') {
-                if (Math.abs(v) >= 1e9) return (v / 1e9).toFixed(0) + 'B';
-                if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(0) + 'M';
-                if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(0) + 'K';
-                return v;
-              }
+              // Fallback (raw KES or ratio)
               if (Math.abs(v) >= 1e9) return (v / 1e9).toFixed(0) + 'B';
               if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(0) + 'M';
               if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(0) + 'K';
@@ -465,7 +476,7 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
 }
 
 function barColors(n) {
-  return Array.from({ length: n }, (_, i) => i === n - 1 ? '#f59e0b' : '#3b82f6');
+  return Array.from({ length: n }, (_, i) => i === n - 1 ? '#00e676' : 'rgba(0,230,118,0.4)');
 }
 
 // ---- Build Dynamic Chart Grid ----
@@ -577,12 +588,12 @@ function renderPriceChart(ticker, range) {
   if (_priceChartInstance) _priceChartInstance.destroy();
 
   const gradient = ctx.getContext('2d');
-  const gradientFill = gradient.createLinearGradient(0, 0, 0, 220);
+  const gradientFill = gradient.createLinearGradient(0, 0, 0, 320);
   if (isUp) {
-    gradientFill.addColorStop(0, 'rgba(0, 230, 118, 0.25)');
+    gradientFill.addColorStop(0, 'rgba(0, 230, 118, 0.2)');
     gradientFill.addColorStop(1, 'rgba(0, 230, 118, 0.0)');
   } else {
-    gradientFill.addColorStop(0, 'rgba(255, 68, 68, 0.25)');
+    gradientFill.addColorStop(0, 'rgba(255, 68, 68, 0.2)');
     gradientFill.addColorStop(1, 'rgba(255, 68, 68, 0.0)');
   }
 
@@ -608,7 +619,7 @@ function renderPriceChart(ticker, range) {
         legend: { display: false },
         tooltip: {
           backgroundColor: '#111111',
-          borderColor: 'rgba(0,230,118,0.12)',
+          borderColor: 'rgba(255,255,255,0.05)',
           borderWidth: 1,
           padding: 12,
           titleFont: { size: 12, weight: 'bold' },
@@ -638,14 +649,14 @@ function renderPriceChart(ticker, range) {
             }
           },
           grid: { display: false },
-          ticks: { color: '#707070', font: { size: 10, weight: 500 }, maxTicksLimit: 8 },
+          ticks: { color: '#5a6a7e', font: { size: 10, weight: 500 }, maxTicksLimit: 8 },
           border: { display: false },
         },
         y: {
-          grid: { color: 'rgba(255, 255, 255, 0.04)', drawTicks: false },
+          grid: { color: 'rgba(30, 45, 61, 0.6)', drawTicks: false },
           border: { display: false },
           ticks: {
-            color: '#707070',
+            color: '#5a6a7e',
             font: { size: 10 },
             callback: (v) => v.toFixed(v >= 100 ? 0 : 2),
           },
@@ -653,6 +664,78 @@ function renderPriceChart(ticker, range) {
       }
     }
   });
+}
+
+function timeAgo(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d)) return '';
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+function formatStaticDate(dateStr) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  return parts[2] + ' ' + months[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
+}
+
+async function fetchNews(ticker, companyName) {
+  const grid = document.getElementById('news-grid');
+  if (!grid) return;
+
+  // Show static news immediately if available
+  const co = NSE_COMPANIES[ticker];
+  const staticNews = co && co.staticNews && co.staticNews.length ? co.staticNews : null;
+
+  if (staticNews) {
+    grid.innerHTML = staticNews.map(a => {
+      const href = a.url ? 'href="' + a.url + '" target="_blank" rel="noopener"' : 'href="#" onclick="return false"';
+      return '<a class="news-card static" ' + href + '><div class="news-card-source"><span>' + a.source + '</span><span class="news-date"> · ' + formatStaticDate(a.date) + '</span></div><div class="news-card-title">' + a.title + '</div></a>';
+    }).join('');
+  } else {
+    grid.innerHTML = '<div class="news-loading">Loading news…</div>';
+  }
+
+  // Also fetch live RSS feeds and append any fresh articles found
+  const feeds = [
+    { url: 'https://businessdailyafrica.com/rss/39546-business-news', name: 'Business Daily', domain: 'businessdailyafrica.com' },
+    { url: 'https://www.standardmedia.co.ke/rss/business.php', name: 'The Standard', domain: 'standardmedia.co.ke' },
+    { url: 'https://www.capitalfm.co.ke/business/feed/', name: 'Capital FM', domain: 'capitalfm.co.ke' },
+  ];
+  const proxy = 'https://api.rss2json.com/v1/api.json?rss_url=';
+  const keywords = [ticker.toLowerCase(), companyName.toLowerCase().split(' ').slice(0, 2).join(' ')];
+  const results = await Promise.allSettled(
+    feeds.map(f => fetch(proxy + encodeURIComponent(f.url)).then(r => r.json()).then(data => ({ feed: f, items: (data.items || []) })))
+  );
+  let articles = [];
+  results.forEach(r => {
+    if (r.status !== 'fulfilled') return;
+    const { feed, items } = r.value;
+    items.forEach(item => {
+      const haystack = ((item.title || '') + ' ' + (item.description || '')).toLowerCase();
+      if (keywords.some(k => k.length > 2 && haystack.includes(k))) articles.push({ ...item, _feed: feed });
+    });
+  });
+  articles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+  articles = articles.slice(0, 5);
+  if (articles.length === 0) {
+    if (!staticNews) {
+      grid.innerHTML = '<div class="news-empty">No recent news found for <strong>' + ticker + '</strong> &nbsp;·&nbsp; <a href="https://businessdailyafrica.com/search?q=' + encodeURIComponent(companyName) + '" target="_blank" rel="noopener">Search Business Daily ↗</a></div>';
+    }
+    return;
+  }
+  const dynamicHtml = articles.map(a => {
+    const fav = 'https://www.google.com/s2/favicons?domain=' + a._feed.domain + '&sz=16';
+    return '<a class="news-card" href="' + a.link + '" target="_blank" rel="noopener"><div class="news-card-source"><img class="news-favicon" src="' + fav + '" alt=""><span>' + a._feed.name + '</span><span class="news-date"> · ' + timeAgo(a.pubDate) + '</span></div><div class="news-card-title">' + a.title + '</div></a>';
+  }).join('');
+  if (staticNews) {
+    grid.innerHTML += dynamicHtml;
+  } else {
+    grid.innerHTML = dynamicHtml;
+  }
 }
 
 // ---- Load Company ----
@@ -666,6 +749,8 @@ function loadCompany() {
 
   document.getElementById('dashboard').classList.remove('hidden');
   document.getElementById('empty-state').classList.add('hidden');
+  const infoRow = document.getElementById('info-row');
+  if (infoRow) infoRow.classList.remove('hidden');
   document.getElementById('sector-overview').classList.add('hidden');
   document.getElementById('btn-companies').classList.add('active');
   document.getElementById('btn-sectors').classList.remove('active');
@@ -674,6 +759,9 @@ function loadCompany() {
   if (bc) bc.textContent = co.ticker + ' | NSE';
   document.getElementById('company-logo').textContent = co.logo || '📈';
   document.getElementById('company-name').textContent = co.name;
+  const descEl = document.getElementById('company-desc-text');
+  if (descEl) descEl.textContent = co.description || 'No description available.';
+  fetchNews(co.ticker, co.name || co.ticker);
   document.getElementById('company-meta').textContent = co.ticker + ' | ' + co.exchange + ' \u00B7 ' + co.sector;
   document.getElementById('company-price').textContent = fmtPrice(co.latestPrice);
 
@@ -1094,7 +1182,7 @@ function renderValuation(co) {
   // Render summary bar
   const barPct = Math.max(5, Math.min(95, 50 + result.upside * 0.5));
   const barColor = result.signalClass === 'undervalued' ? '#10b981' :
-                   result.signalClass === 'overvalued' ? '#ef4444' : '#f59e0b';
+                   result.signalClass === 'overvalued' ? '#ff4444' : '#ffa000';
 
   summary.innerHTML =
     '<div class="val-summary-header">' +
@@ -1139,21 +1227,27 @@ async function loadMarketData() {
     NSE_MARKET = null;
   }
 
-  // Populate index pills
+  // Populate NSE index cards in market summary
   if (NSE_MARKET) {
     const nse20 = NSE_MARKET.nse20;
     const nseAll = NSE_MARKET.nseAllShare;
     if (nse20) {
-      document.getElementById('nse20-val').textContent = nse20.value.toLocaleString();
+      const valEl = document.getElementById('nse20-val');
       const chgEl = document.getElementById('nse20-chg');
-      chgEl.textContent = (nse20.change_pct >= 0 ? '+' : '') + nse20.change_pct.toFixed(2) + '%';
-      chgEl.className = 'idx-chg ' + (nse20.change_pct >= 0 ? 'positive' : 'negative');
+      if (valEl) valEl.textContent = nse20.value.toLocaleString();
+      if (chgEl) {
+        chgEl.textContent = (nse20.change_pct >= 0 ? '+' : '') + nse20.change_pct.toFixed(2) + '%';
+        chgEl.className = 'market-card-chg ' + (nse20.change_pct >= 0 ? 'positive' : 'negative');
+      }
     }
     if (nseAll) {
-      document.getElementById('nseall-val').textContent = nseAll.value.toLocaleString();
+      const valEl = document.getElementById('nseall-val');
       const chgEl = document.getElementById('nseall-chg');
-      chgEl.textContent = (nseAll.change_pct >= 0 ? '+' : '') + nseAll.change_pct.toFixed(2) + '%';
-      chgEl.className = 'idx-chg ' + (nseAll.change_pct >= 0 ? 'positive' : 'negative');
+      if (valEl) valEl.textContent = nseAll.value.toLocaleString();
+      if (chgEl) {
+        chgEl.textContent = (nseAll.change_pct >= 0 ? '+' : '') + nseAll.change_pct.toFixed(2) + '%';
+        chgEl.className = 'market-card-chg ' + (nseAll.change_pct >= 0 ? 'positive' : 'negative');
+      }
     }
   }
 }
@@ -1162,6 +1256,10 @@ async function loadMarketData() {
 function renderMarketSummary() {
   const companies = Object.entries(NSE_COMPANIES);
   const withPrices = companies.filter(([, c]) => c.latestPrice && c.latestPrice > 0);
+
+  // Stocks tracked (element may not exist in new layout)
+  const msStocks = document.getElementById('ms-stocks');
+  if (msStocks) msStocks.textContent = companies.length;
 
   // Top gainer & loser
   if (withPrices.length > 0) {
@@ -1179,6 +1277,9 @@ function renderMarketSummary() {
     }
     if (NSE_MARKET.topLoser) {
       document.getElementById('ms-loser').textContent = NSE_MARKET.topLoser.ticker + ' ' + NSE_MARKET.topLoser.change_pct.toFixed(1) + '%';
+    }
+    if (NSE_MARKET.stocksTracked) {
+      document.getElementById('ms-stocks').textContent = NSE_MARKET.stocksTracked;
     }
   }
 
@@ -1205,6 +1306,15 @@ function renderMarketSummary() {
     }
   }
 
+  // Most active (element may not exist in new layout)
+  const msActive = document.getElementById('ms-active');
+  if (msActive) {
+    const withData = companies.filter(([, c]) => c.annuals && c.annuals.length > 0);
+    if (withData.length > 0) {
+      const byData = [...withData].sort((a, b) => (b[1].annuals.length + (b[1].quarters || []).length) - (a[1].annuals.length + (a[1].quarters || []).length));
+      msActive.textContent = byData[0][0];
+    }
+  }
 }
 
 // ---- View Toggle ----
@@ -1214,6 +1324,11 @@ function showView(view) {
   _currentView = view;
   document.getElementById('btn-companies').classList.toggle('active', view === 'companies');
   document.getElementById('btn-sectors').classList.toggle('active', view === 'sectors');
+  // Sync center nav links
+  const navDash = document.getElementById('nav-dashboard');
+  const navSectors = document.getElementById('nav-sectors');
+  if (navDash) navDash.classList.toggle('active', view === 'companies');
+  if (navSectors) navSectors.classList.toggle('active', view === 'sectors');
 
   const dashboard = document.getElementById('dashboard');
   const emptyState = document.getElementById('empty-state');
@@ -1392,8 +1507,29 @@ function selectFromSector(ticker) {
   loadCompany();
 }
 
+// ---- Theme Toggle ----
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = isLight ? '🌙' : '☀️';
+  try { localStorage.setItem('nse-theme', isLight ? 'light' : 'dark'); } catch(e) {}
+  // Re-render charts to pick up new colors
+  if (activeCompany) loadCompany();
+}
+
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('nse-theme'); } catch(e) {}
+  if (saved === 'light') {
+    document.body.classList.add('light');
+    const btn = document.getElementById('theme-toggle');
+    if (btn) btn.textContent = '🌙';
+  }
+}
+
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   await loadPrices();
   await loadMarketData();
   populateDropdown();
