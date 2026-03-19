@@ -1507,11 +1507,88 @@ function selectFromSector(ticker) {
   loadCompany();
 }
 
+// ---- Mobile Navigation ----
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobile-menu');
+  const hamburger = document.getElementById('hamburger-menu');
+  if (menu && hamburger) {
+    menu.classList.toggle('hidden');
+    hamburger.classList.toggle('active');
+  }
+}
+
+function closeMobileMenu() {
+  const menu = document.getElementById('mobile-menu');
+  const hamburger = document.getElementById('hamburger-menu');
+  if (menu && hamburger) {
+    menu.classList.add('hidden');
+    hamburger.classList.remove('active');
+  }
+}
+
+// Close mobile menu when clicking outside
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('mobile-menu');
+  const hamburger = document.getElementById('hamburger-menu');
+  if (menu && hamburger && !menu.contains(e.target) && !hamburger.contains(e.target)) {
+    closeMobileMenu();
+  }
+});
+
+// ---- Touch Gesture Handler (Swipe for charts) ----
+let touchStartX = 0;
+let touchStartY = 0;
+
+function handleTouchStart(e) {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}
+
+function handleTouchEnd(e) {
+  const touchEndX = e.changedTouches[0].clientX;
+  const touchEndY = e.changedTouches[0].clientY;
+  const diffX = touchStartX - touchEndX;
+  const diffY = touchStartY - touchEndY;
+
+  // Only trigger if horizontal swipe is more prominent than vertical
+  if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+    // Swiped left (next), or right (previous)
+    if (diffX > 0) {
+      // Next chart/view
+      onChartSwipeNext();
+    } else {
+      // Previous chart/view
+      onChartSwipePrev();
+    }
+  }
+}
+
+function onChartSwipeNext() {
+  // Navigate to next chart or section (to be implemented per view)
+  // For now, placeholder
+}
+
+function onChartSwipePrev() {
+  // Navigate to previous chart or section (to be implemented per view)
+  // For now, placeholder
+}
+
+// Add touch listeners to chart containers
+document.addEventListener('DOMContentLoaded', () => {
+  const chartContainer = document.getElementById('sector-charts-container');
+  if (chartContainer) {
+    chartContainer.addEventListener('touchstart', handleTouchStart, false);
+    chartContainer.addEventListener('touchend', handleTouchEnd, false);
+  }
+});
+
 // ---- Theme Toggle ----
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
   const btn = document.getElementById('theme-toggle');
+  const mobileBtn = document.getElementById('theme-toggle-mobile');
   if (btn) btn.textContent = isLight ? '🌙' : '☀️';
+  if (mobileBtn) mobileBtn.textContent = isLight ? '🌙' : '☀️';
   try { localStorage.setItem('nse-theme', isLight ? 'light' : 'dark'); } catch(e) {}
 
   // Update chart colors without losing company context
@@ -1540,7 +1617,9 @@ function initTheme() {
   if (saved === 'light') {
     document.body.classList.add('light');
     const btn = document.getElementById('theme-toggle');
+    const mobileBtn = document.getElementById('theme-toggle-mobile');
     if (btn) btn.textContent = '🌙';
+    if (mobileBtn) mobileBtn.textContent = '🌙';
   }
 }
 

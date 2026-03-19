@@ -1257,3 +1257,433 @@ select optgroup { background: var(--bg-surface); color: #000; font-weight: 700; 
   opacity: 1;
   transform: scale(1.15);
 }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* MOBILE OPTIMIZATION — Hamburger Menu + Touch UX            */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* ── Hamburger Menu Button (hidden on desktop) ──────────── */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  align-items: center;
+  justify-content: center;
+}
+.hamburger span {
+  width: 24px;
+  height: 2px;
+  background: var(--accent-primary);
+  display: block;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+.hamburger.active span:nth-child(1) {
+  transform: rotate(45deg) translate(10px, 10px);
+}
+.hamburger.active span:nth-child(2) {
+  opacity: 0;
+}
+.hamburger.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(7px, -7px);
+}
+
+/* ── Mobile Menu Panel ─────────────────────────────────── */
+.mobile-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 999;
+  opacity: 1;
+  transition: opacity 0.3s;
+}
+.mobile-menu.hidden {
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+}
+.mobile-menu-content {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 70vw;
+  max-width: 300px;
+  height: 100vh;
+  background: var(--bg-base);
+  z-index: 1000;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.5);
+  animation: slideInMenu 0.3s ease-out;
+}
+@keyframes slideInMenu {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.mobile-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-dim);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.close-mobile-menu {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mobile-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 0.95rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+.mobile-nav-link:hover,
+.mobile-nav-link:active {
+  background-color: var(--bg-card);
+  color: var(--accent-primary);
+}
+.mobile-menu-divider {
+  border: none;
+  border-top: 1px solid var(--border-dim);
+  margin: 0.5rem 0;
+}
+
+/* ── Nav Desktop (hidden on mobile) ───────────────────── */
+.nav-desktop {
+  display: flex;
+}
+
+/* ── Responsive: Hide nav on desktop, show on mobile ──── */
+@media (max-width: 768px) {
+  /* Hide desktop nav elements */
+  .nav-desktop {
+    display: none !important;
+  }
+  /* Show hamburger menu */
+  .hamburger {
+    display: flex;
+  }
+  /* Adjust topnav for mobile */
+  .topnav {
+    justify-content: space-between;
+  }
+  .topnav-left {
+    flex: 1;
+  }
+  .topnav-right {
+    display: none;
+  }
+  .topnav-center {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* MOBILE LAYOUTS — Responsive Grid & Stacking               */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* ── Tablet (768px - 1024px) ──────────────────────────── */
+@media (max-width: 1024px) {
+  .company-chart-row {
+    grid-template-columns: 1fr;
+  }
+  .info-row {
+    grid-template-columns: 1fr;
+  }
+  .sector-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Mobile (<768px) ───────────────────────────────────── */
+@media (max-width: 768px) {
+  /* ── Search Bar ──────────────────────────────────── */
+  .search-bar {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .search-bar select,
+  .search-bar button {
+    width: 100%;
+  }
+  .view-toggle {
+    width: 100%;
+  }
+  .view-btn {
+    flex: 1;
+  }
+
+  /* ── Company Header ──────────────────────────────── */
+  .company-header {
+    padding: 1rem 1rem;
+  }
+  .company-price-block {
+    gap: 0.25rem;
+  }
+  .company-price {
+    font-size: 1.5rem;
+  }
+  .company-eps-pill {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  /* ── Price Chart ─────────────────────────────────── */
+  .price-chart-section {
+    margin-top: 1rem;
+  }
+  .price-range-btns {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .range-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+  }
+  .price-chart-wrap {
+    height: 200px;
+  }
+
+  /* ── Info Row (Description + News) ────────────── */
+  .company-desc-card {
+    padding: 1rem;
+  }
+  .company-desc-text {
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  .news-section {
+    margin-top: 1rem;
+  }
+  .news-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  /* ── Stats Grid (Financial Data) ─────────────── */
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .stat-box {
+    padding: 0.75rem;
+  }
+  .stat-label {
+    font-size: 0.7rem;
+  }
+  .stat-value {
+    font-size: 0.95rem;
+  }
+
+  /* ── Financial Charts ────────────────────────── */
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+  .chart-card {
+    min-height: 180px;
+  }
+  .chart-card-wrap {
+    height: 120px;
+  }
+
+  /* ── Valuation Panel ─────────────────────────── */
+  .valuation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* ── Period Toggle ───────────────────────────── */
+  .period-toggle {
+    gap: 0.5rem;
+  }
+  .toggle-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  /* ── Sector Grid ─────────────────────────────── */
+  .sector-grid {
+    grid-template-columns: 1fr;
+  }
+  .sector-card {
+    padding: 1rem;
+  }
+
+  /* ── Footer ──────────────────────────────────── */
+  .site-footer {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    text-align: center;
+  }
+  .footer-left,
+  .footer-center,
+  .footer-right {
+    width: 100%;
+  }
+
+  /* ── Market Summary ──────────────────────────── */
+  .market-summary {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+  .market-card {
+    padding: 0.75rem;
+  }
+  .market-card-label {
+    font-size: 0.65rem;
+  }
+  .market-card-value {
+    font-size: 0.95rem;
+  }
+}
+
+/* ── Small Mobile (<480px) ────────────────────────────── */
+@media (max-width: 480px) {
+  .topnav {
+    padding: 0.5rem 0.75rem;
+  }
+  .logo-text {
+    display: none;
+  }
+  .logo-dot {
+    display: inline-block;
+  }
+
+  .search-bar-wrap {
+    padding: 0.75rem;
+  }
+  .search-bar {
+    gap: 0.4rem;
+  }
+  .exchange-tag {
+    display: none;
+  }
+
+  .company-header {
+    padding: 0.75rem;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .company-info {
+    gap: 0.5rem;
+  }
+  .company-logo {
+    font-size: 2rem;
+  }
+  .company-name {
+    font-size: 1.1rem;
+  }
+  .company-meta {
+    font-size: 0.75rem;
+  }
+
+  .price-range-btns {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .market-summary {
+    grid-template-columns: 1fr;
+  }
+  .market-card-value {
+    font-size: 0.85rem;
+  }
+
+  .chart-card {
+    min-height: 160px;
+  }
+  .chart-card-wrap {
+    height: 100px;
+  }
+
+  .stats-box {
+    padding: 0.5rem;
+  }
+  .stat-label {
+    font-size: 0.65rem;
+  }
+  .stat-value {
+    font-size: 0.85rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* TOUCH INTERACTIONS — Tap Targets & States                  */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* Increase tap target size on mobile */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Remove hover states on touch devices, use active instead */
+  button:hover {
+    background-color: transparent;
+  }
+
+  button:active,
+  a:active {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+
+  /* Chart tooltips on touch */
+  canvas {
+    touch-action: manipulation;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ACCESSIBILITY — Responsive Type Scaling                    */
+/* ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 13px;
+  }
+}
