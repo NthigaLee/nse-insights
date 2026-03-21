@@ -1927,7 +1927,7 @@ function renderSectorSnapshot(sectorName) {
     cards.push({ label: 'Avg ROE', value: agg.avgROE + '%' });
   }
   if (agg.avgGrowth !== null) {
-    cards.push({ label: 'Avg Growth', value: (agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) + '%' });
+    cards.push({ label: 'Avg Growth', value: (agg.avgGrowth != null ? (agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) : '0') + '%' });
   }
 
   snapshotGrid.innerHTML = cards.map(card => {
