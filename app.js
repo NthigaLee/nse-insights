@@ -1314,8 +1314,8 @@ function calculateSectorAggregates(sectorName) {
     }
   });
 
-  const avgPE = peValues.length > 0 ? (peValues.reduce((a, b) => a + b, 0) / peValues.length).toFixed(1) : null;
-  const avgROE = roeValues.length > 0 ? (roeValues.reduce((a, b) => a + b, 0) / roeValues.length).toFixed(1) : null;
+  const avgPE = peValues.length > 0 ? (peValues.reduce((a, b) => a + b, 0) / peValues.length) : null;
+  const avgROE = roeValues.length > 0 ? (roeValues.reduce((a, b) => a + b, 0) / roeValues.length) : null;
   const avgGrowth = priceChangeValues.length > 0 ? (priceChangeValues.reduce((a, b) => a + b, 0) / priceChangeValues.length) : null;
 
   // Sector strength indicator based on average price change
@@ -1327,7 +1327,7 @@ function calculateSectorAggregates(sectorName) {
     marketCap: totalMarketCap > 0 ? totalMarketCap : null,
     avgPE,
     avgROE,
-    avgGrowth: parseFloat(avgGrowth),
+    avgGrowth,
     strength,
     companyCount: companies.length,
   };
