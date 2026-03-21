@@ -593,6 +593,23 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
     if (c5 !== null) h += pill('5Y', c5);
     gc.innerHTML = h;
   } else if (gc) gc.innerHTML = '';
+
+  // Add click handler to open chart in modal
+  const canvasElement = document.getElementById(canvasId);
+  if (canvasElement) {
+    canvasElement.style.cursor = 'pointer';
+    canvasElement.addEventListener('click', () => {
+      openChartModal(
+        opts.title || 'Chart',
+        {
+          type: 'bar',
+          data: { labels, datasets },
+          options: chartInstances[canvasId].options
+        },
+        opts.metadata || ''
+      );
+    });
+  }
 }
 
 function barColors(n) {
@@ -784,6 +801,25 @@ function renderPriceChart(ticker, range) {
       }
     }
   });
+
+  // Add click handler to price chart
+  const priceChartCanvas = document.getElementById('chart-price');
+  if (priceChartCanvas) {
+    priceChartCanvas.style.cursor = 'pointer';
+    priceChartCanvas.addEventListener('click', () => {
+      if (_priceChartInstance) {
+        openChartModal(
+          ticker + ' - Price Chart',
+          {
+            type: 'line',
+            data: _priceChartInstance.data,
+            options: _priceChartInstance.options
+          },
+          'Last ' + (_currentRange || '1Y')
+        );
+      }
+    });
+  }
 }
 
 function timeAgo(dateStr) {
