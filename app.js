@@ -594,21 +594,18 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
     gc.innerHTML = h;
   } else if (gc) gc.innerHTML = '';
 
-  // Add click handler to open chart in modal
-  const canvasElement = document.getElementById(canvasId);
-  if (canvasElement) {
-    canvasElement.style.cursor = 'pointer';
-    canvasElement.addEventListener('click', () => {
+  // Add click handler to parent card to open chart in modal
+  const card = ctx.closest('.chart-card');
+  if (card) {
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', () => {
       if (chartInstances[canvasId]) {
-        openChartModal(
-          opts.title || 'Chart',
-          {
-            type: 'bar',
-            data: { labels, datasets },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-          },
-          opts.metadata || ''
-        );
+        const chartConfig = {
+          type: 'bar',
+          data: { labels, datasets },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        };
+        openChartModal(opts.title || 'Chart', chartConfig, opts.metadata || '');
       }
     });
   }
