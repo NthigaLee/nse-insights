@@ -1790,7 +1790,7 @@ function renderSectorOverview() {
     let statsHtml = '<div class="sector-card-stats">';
     if (agg.avgPE) statsHtml += '<span class="stat-badge">P/E: ' + agg.avgPE + 'x</span>';
     if (agg.avgROE) statsHtml += '<span class="stat-badge">ROE: ' + agg.avgROE + '%</span>';
-    statsHtml += '<span class="stat-badge strength-' + agg.strength + '">' + strengthEmoji + ' ' + (agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) + '%</span>';
+    statsHtml += '<span class="stat-badge strength-' + agg.strength + '">' + strengthEmoji + ' ' + (agg.avgGrowth != null ? (agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) : '0') + '%</span>';
     statsHtml += '</div>';
 
     return '<div class="sector-card" onclick="renderSectorTable(\'' + sec.replace(/'/g, "\\'") + '\')">' +
