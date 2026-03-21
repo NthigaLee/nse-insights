@@ -8,6 +8,41 @@ let activeCompany = null;
 let chartInstances = {};
 let NSE_PRICES = {};
 
+// ---- Tier Access Management ----
+function initTierUI() {
+  const badge = document.getElementById('tier-badge');
+  if (badge) {
+    const tier = tierAccess.userTier;
+    const tierInfo = tierAccess.getTierInfo();
+    badge.textContent = tierInfo.name;
+    badge.className = `tier-badge ${tier}`;
+    badge.title = tierInfo.description;
+  }
+}
+
+function updateTierUI() {
+  initTierUI();
+
+  // Update max companies display if admin section is visible
+  const adminLink = document.querySelector('.admin-padlock');
+  if (adminLink && tierAccess.canAccessAdmin()) {
+    adminLink.style.opacity = '1';
+  } else if (adminLink) {
+    adminLink.style.opacity = '0.3';
+  }
+
+  // Update valuation panel visibility
+  const valuationPanel = document.getElementById('valuation-panel');
+  if (valuationPanel && !tierAccess.canViewValuation()) {
+    valuationPanel.classList.add('hidden');
+  }
+}
+
+// Listen for tier changes
+window.addEventListener('tierChanged', () => {
+  updateTierUI();
+});
+
 // ---- Sector Templates ----
 // Each sector defines which charts to show, in which rows,
 // and which stats to display. This way banks show loan books,
@@ -2145,6 +2180,7 @@ function initTheme() {
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
+  initTierUI();
   await loadPrices();
   await loadMarketData();
   populateDropdown();
