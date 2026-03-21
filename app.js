@@ -1754,6 +1754,12 @@ function renderSectorOverview() {
   grid.style.display = '';
   tableWrap.classList.add('hidden');
 
+  // Check if data is loaded
+  if (!NSE_COMPANIES || Object.keys(NSE_COMPANIES).length === 0) {
+    grid.innerHTML = '<div style="grid-column: 1/-1; padding: 3rem; text-align: center; color: var(--text-muted);">Loading sectors...</div>';
+    return;
+  }
+
   // Group companies by normalized sector
   const sectors = {};
   for (const [ticker, co] of Object.entries(NSE_COMPANIES)) {
