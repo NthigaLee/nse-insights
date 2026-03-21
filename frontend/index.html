@@ -213,7 +213,21 @@
       <div class="sector-table-header">
         <button class="sector-back-btn" onclick="showSectorGrid()">&larr; All Sectors</button>
         <span class="sector-table-title" id="sector-table-title">—</span>
+        <button class="sector-compare-toggle" id="sector-compare-toggle" onclick="toggleSectorComparison()" title="Compare vs NSE average">📊</button>
       </div>
+
+      <!-- Sector Snapshot -->
+      <div class="sector-snapshot hidden" id="sector-snapshot">
+        <div class="snapshot-label">Sector Snapshot</div>
+        <div class="snapshot-grid" id="snapshot-grid"></div>
+      </div>
+
+      <!-- Sector Comparison -->
+      <div class="sector-comparison hidden" id="sector-comparison">
+        <div class="comparison-label">Sector vs NSE Average</div>
+        <div class="comparison-grid" id="comparison-grid"></div>
+      </div>
+
       <div class="sector-table-scroll">
         <table class="sector-table" id="sector-table">
           <thead><tr id="sector-table-head"></tr></thead>
@@ -243,6 +257,26 @@
     <div class="empty-sub">Select a company above to view financials, charts, and key metrics.</div>
   </div>
 
+  <!-- Chart Expand Modal -->
+  <div id="chart-modal" class="chart-modal hidden">
+    <div class="chart-modal-overlay"></div>
+    <div class="chart-modal-content">
+      <div class="chart-modal-header">
+        <h3 class="chart-modal-title">—</h3>
+        <div class="chart-modal-controls">
+          <button class="chart-modal-fullscreen" id="chart-modal-fullscreen" title="Open in new tab">⛶</button>
+          <button class="chart-modal-close" id="chart-modal-close" title="Close">&times;</button>
+        </div>
+      </div>
+      <div class="chart-modal-body">
+        <canvas id="chart-modal-canvas"></canvas>
+      </div>
+      <div class="chart-modal-footer">
+        <span class="chart-modal-meta" id="chart-modal-meta"></span>
+      </div>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer class="site-footer">
     <div class="footer-left">
@@ -252,7 +286,7 @@
     <div class="footer-center">
       <a href="landing.html">Home</a>
       <a href="login.html">Sign in</a>
-      <a href="admin_review.html">Admin</a>
+      <a href="admin.html">Admin</a>
     </div>
     <div class="footer-right">© 2026 NSE Insights</div>
   </footer>

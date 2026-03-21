@@ -378,6 +378,7 @@
       <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Admin Review Panel</span>
     </div>
     <div style="display: flex; gap: 1rem; align-items: center;">
+      <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode" onclick="toggleTheme()" style="margin-right: 0.5rem;">☀️</button>
       <a href="index.html" style="color: var(--accent-primary); text-decoration: none; font-size: 0.9rem;">← Back to Dashboard</a>
     </div>
   </nav>
@@ -634,8 +635,27 @@
       a.click();
     }
 
+    // ── Theme Toggle ────────────────────────────────────────
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle('light');
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.textContent = isLight ? '🌙' : '☀️';
+      try { localStorage.setItem('nse-theme', isLight ? 'light' : 'dark'); } catch(e) {}
+    }
+
+    function initTheme() {
+      let saved = null;
+      try { saved = localStorage.getItem('nse-theme'); } catch(e) {}
+      if (saved === 'light') {
+        document.body.classList.add('light');
+        const btn = document.getElementById('theme-toggle');
+        if (btn) btn.textContent = '🌙';
+      }
+    }
+
     // ── Initialize on page load ──────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
+      initTheme();
       populateCompanyList();
     });
   </script>

@@ -43,6 +43,16 @@ const SECTOR_TEMPLATES = {
         { label: 'Loan Book', key: 'loans', fmt: 'num' },
         { label: 'Equity', key: 'totalEquity', fmt: 'num' },
       ]},
+      { title: 'Financial Health', rows: [
+        { label: 'ROE %', key: '_roe', fmt: 'raw' },
+        { label: 'ROA %', key: '_roa', fmt: 'raw' },
+        { label: 'Net Margin %', key: '_profitmargin', fmt: 'raw' },
+        { label: 'Debt/Equity', key: '_debtequity', fmt: 'raw' },
+      ]},
+      { title: 'Growth Trends', rows: [
+        { label: 'EPS 5Y CAGR', key: '_eps5yrgrowth', fmt: 'raw' },
+        { label: 'Revenue 5Y CAGR', key: '_revenue5yrgrowth', fmt: 'raw' },
+      ]},
     ],
     chartRows: [
       { label: 'Income Statement', charts: [
@@ -89,6 +99,16 @@ const SECTOR_TEMPLATES = {
         { label: 'Last Period', key: '_lastPeriod', fmt: 'raw' },
         { label: 'Data Points', key: '_dataPoints', fmt: 'raw' },
       ]},
+      { title: 'Financial Health', rows: [
+        { label: 'ROE %', key: '_roe', fmt: 'raw' },
+        { label: 'ROA %', key: '_roa', fmt: 'raw' },
+        { label: 'Net Margin %', key: '_profitmargin', fmt: 'raw' },
+        { label: 'Debt/Equity', key: '_debtequity', fmt: 'raw' },
+      ]},
+      { title: 'Growth Trends', rows: [
+        { label: 'EPS 5Y CAGR', key: '_eps5yrgrowth', fmt: 'raw' },
+        { label: 'Revenue 5Y CAGR', key: '_revenue5yrgrowth', fmt: 'raw' },
+      ]},
     ],
     chartRows: [
       { label: 'Income Statement', charts: [
@@ -130,6 +150,16 @@ const SECTOR_TEMPLATES = {
       { title: 'Balance Sheet', rows: [
         { label: 'Total Assets', key: 'totalAssets', fmt: 'num' },
         { label: 'Total Equity', key: 'totalEquity', fmt: 'num' },
+      ]},
+      { title: 'Financial Health', rows: [
+        { label: 'ROE %', key: '_roe', fmt: 'raw' },
+        { label: 'ROA %', key: '_roa', fmt: 'raw' },
+        { label: 'Net Margin %', key: '_profitmargin', fmt: 'raw' },
+        { label: 'Debt/Equity', key: '_debtequity', fmt: 'raw' },
+      ]},
+      { title: 'Growth Trends', rows: [
+        { label: 'EPS 5Y CAGR', key: '_eps5yrgrowth', fmt: 'raw' },
+        { label: 'Revenue 5Y CAGR', key: '_revenue5yrgrowth', fmt: 'raw' },
       ]},
     ],
     chartRows: [
@@ -271,6 +301,96 @@ const DEFAULT_TEMPLATE = {
 
 function getTemplate(sector) {
   return SECTOR_TEMPLATES[sector] || DEFAULT_TEMPLATE;
+}
+
+// ---- Financial Ratio Calculations ----
+// Helper functions for computing financial ratios from company data
+
+function calcROE(latest, prev) {
+  // Return on Equity = Net Income / Shareholders Equity
+  if (!latest || !latest.pat || !latest.totalEquity || latest.totalEquity <= 0) return null;
+  return ((latest.pat / latest.totalEquity) * 100).toFixed(1);
+}
+
+function calcROA(latest, prev) {
+  // Return on Assets = Net Income / Total Assets
+  if (!latest || !latest.pat || !latest.totalAssets || latest.totalAssets <= 0) return null;
+  return ((latest.pat / latest.totalAssets) * 100).toFixed(1);
+}
+
+function calcDebtEquity(latest, prev) {
+  // Debt-to-Equity Ratio = Total Debt / Shareholders Equity
+  // Approximation: Total Liabilities = Total Assets - Shareholders Equity
+  if (!latest || !latest.totalAssets || !latest.totalEquity || latest.totalEquity <= 0) return null;
+  const debt = latest.totalAssets - latest.totalEquity;
+  return (debt / latest.totalEquity).toFixed(2);
+}
+
+function calcAssetTurnover(latest, prev) {
+  // Asset Turnover = Revenue / Total Assets
+  if (!latest || !latest.revenue || !latest.totalAssets || latest.totalAssets <= 0) return null;
+  return (latest.revenue / latest.totalAssets).toFixed(2);
+}
+
+function calcProfitMargin(latest, prev) {
+  // Net Profit Margin = Net Income / Revenue
+  if (!latest || !latest.pat || !latest.revenue || latest.revenue <= 0) return null;
+  return ((latest.pat / latest.revenue) * 100).toFixed(1);
+}
+
+function calcGrossMargin(latest, prev) {
+  // Gross Margin = (Revenue - COGS) / Revenue
+  // Not all companies have COGS data, so this returns null if unavailable
+  if (!latest || !latest.revenue || latest.revenue <= 0 || !latest.cogs) return null;
+  return (((latest.revenue - latest.cogs) / latest.revenue) * 100).toFixed(1);
+}
+
+function calcCAGR(dataArray, periods) {
+  // Compound Annual Growth Rate
+  // dataArray: array of numeric values in chronological order (oldest first)
+  // periods: number of years between first and last value
+  if (!dataArray || dataArray.length < 2 || periods <= 0) return null;
+
+  const first = dataArray[0];
+  const last = dataArray[dataArray.length - 1];
+
+  if (first <= 0 || last <= 0 || first === null || last === null) return null;
+
+  const cagr = (Math.pow(last / first, 1 / periods) - 1) * 100;
+  return cagr.toFixed(1);
+}
+
+function calcEPS5YrGrowth(company) {
+  // 5-year EPS CAGR
+  if (!company.annuals || company.annuals.length < 2) return null;
+  const eps = company.annuals.slice(0, Math.min(5, company.annuals.length))
+    .reverse() // newest first, reverse to oldest first
+    .map(d => d.eps)
+    .filter(e => e && e > 0);
+
+  if (eps.length < 2) return null;
+  const years = eps.length - 1;
+  return calcCAGR(eps, years);
+}
+
+function calcRevenue5YrGrowth(company) {
+  // 5-year Revenue CAGR
+  if (!company.annuals || company.annuals.length < 2) return null;
+  const rev = company.annuals.slice(0, Math.min(5, company.annuals.length))
+    .reverse()
+    .map(d => d.revenue)
+    .filter(r => r && r > 0);
+
+  if (rev.length < 2) return null;
+  const years = rev.length - 1;
+  return calcCAGR(rev, years);
+}
+
+function calcCurrentRatio(latest, prev) {
+  // Current Ratio = Current Assets / Current Liabilities
+  // Not all companies have this data, so returns null if unavailable
+  if (!latest || !latest.currentAssets || !latest.currentLiabilities || latest.currentLiabilities <= 0) return null;
+  return (latest.currentAssets / latest.currentLiabilities).toFixed(2);
 }
 
 // ---- Load Prices ----
@@ -842,6 +962,17 @@ function renderStatsGrid(co, template) {
   computed['_lastPeriod'] = latestLabel;
   computed['_dataPoints'] = String(annualRows.length);
 
+  // Financial Ratios (calculated via utility functions)
+  computed['_roe'] = calcROE(latest, prev);
+  computed['_roa'] = calcROA(latest, prev);
+  computed['_debtequity'] = calcDebtEquity(latest, prev);
+  computed['_assetturnover'] = calcAssetTurnover(latest, prev);
+  computed['_profitmargin'] = calcProfitMargin(latest, prev);
+  computed['_grossmargin'] = calcGrossMargin(latest, prev);
+  computed['_currentratio'] = calcCurrentRatio(latest, prev);
+  computed['_eps5yrgrowth'] = calcEPS5YrGrowth(co);
+  computed['_revenue5yrgrowth'] = calcRevenue5YrGrowth(co);
+
   function getVal(key) {
     if (key.startsWith('_growth_')) {
       const g = computed[key];
@@ -849,6 +980,18 @@ function renderStatsGrid(co, template) {
     }
     if (key.startsWith('_')) {
       const v = computed[key];
+      if (v === null || v === undefined) return { text: '\u2014', cls: '' };
+
+      // Format specific ratio types
+      if (key.includes('roe') || key.includes('roa') || key.includes('margin') || key.includes('growth')) {
+        // These are percentages
+        return { text: (typeof v === 'number' ? v : v) + '%', cls: '' };
+      }
+      if (key.includes('debtequity') || key.includes('assetturnover') || key.includes('currentratio')) {
+        // These are pure ratios
+        return { text: String(v), cls: '' };
+      }
+      // Default formatting
       return { text: typeof v === 'number' ? fmtPrice(v) : String(v || '\u2014'), cls: '' };
     }
     return null; // Will be formatted by fmt
@@ -923,6 +1066,88 @@ function setPeriod(period) {
   document.getElementById('toggle-annual').classList.toggle('active', period === 'annual');
   document.getElementById('toggle-quarterly').classList.toggle('active', period === 'quarterly');
   renderCharts(_currentCompany, period);
+}
+
+// ---- Chart Modal (Expand) ----
+let _modalChartInstance = null;
+
+function openChartModal(chartTitle, chartConfig, metadata) {
+  const modal = document.getElementById('chart-modal');
+  const titleEl = document.querySelector('.chart-modal-title');
+  const metaEl = document.getElementById('chart-modal-meta');
+  const canvas = document.getElementById('chart-modal-canvas');
+
+  // Set title and metadata
+  titleEl.textContent = chartTitle;
+  metaEl.textContent = metadata || '';
+
+  // Destroy old instance if exists
+  if (_modalChartInstance) _modalChartInstance.destroy();
+
+  // Create new chart in modal
+  const ctx = canvas.getContext('2d');
+  _modalChartInstance = new Chart(ctx, chartConfig);
+
+  // Show modal
+  modal.classList.remove('hidden');
+}
+
+function closeChartModal() {
+  const modal = document.getElementById('chart-modal');
+  modal.classList.add('hidden');
+  if (_modalChartInstance) {
+    _modalChartInstance.destroy();
+    _modalChartInstance = null;
+  }
+}
+
+function initChartModalHandlers() {
+  // Close button
+  document.getElementById('chart-modal-close').addEventListener('click', closeChartModal);
+
+  // Overlay click to close
+  document.querySelector('.chart-modal-overlay').addEventListener('click', closeChartModal);
+
+  // ESC key to close
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !document.getElementById('chart-modal').classList.contains('hidden')) {
+      closeChartModal();
+    }
+  });
+
+  // Fullscreen button
+  document.getElementById('chart-modal-fullscreen').addEventListener('click', () => {
+    const canvas = document.getElementById('chart-modal-canvas');
+    if (canvas && _modalChartInstance) {
+      // Open in new tab with data
+      const dataUrl = canvas.toDataURL('image/png');
+      const newWin = window.open();
+      newWin.document.write('<img src="' + dataUrl + '" style="max-width:100%;height:auto;">');
+    }
+  });
+
+  // Expand icon click delegation
+  document.getElementById('sector-charts-container').addEventListener('click', (e) => {
+    const expandBtn = e.target.closest('.chart-expand');
+    if (!expandBtn) return;
+
+    const card = expandBtn.closest('.chart-card');
+    const canvas = card.querySelector('canvas');
+    if (!canvas) return;
+
+    const chartId = canvas.id;
+    const canvasInstance = chartInstances[chartId];
+    if (!canvasInstance) return;
+
+    const titleEl = card.querySelector('.chart-title');
+    const chartTitle = titleEl ? titleEl.textContent.trim() : 'Chart';
+
+    // Clone chart config
+    const config = { ...canvasInstance.config };
+    const metadata = 'Company: ' + (_currentCompany?.ticker || '—') + ' | Period: ' + _currentPeriod;
+
+    openChartModal(chartTitle, config, metadata);
+  });
 }
 
 // ---- Populate dropdown with all stocks ----
@@ -1000,6 +1225,110 @@ const KENYA_MARKET = {
     DEFAULT: 10.0,
   },
 };
+
+// ---- Sector Aggregation Functions ----
+function calculateSectorAggregates(sectorName) {
+  // Group all companies in sector and calculate aggregate metrics
+  const companies = Object.entries(NSE_COMPANIES)
+    .filter(([, co]) => normalizeSector(co.sector) === sectorName)
+    .map(([, co]) => co)
+    .filter(co => co.annuals && co.annuals.length > 0); // Only companies with financials
+
+  if (companies.length === 0) {
+    return {
+      marketCap: null,
+      avgPE: null,
+      avgROE: null,
+      avgGrowth: null,
+      strength: null,
+      companyCount: 0,
+    };
+  }
+
+  // Market Cap: sum of (price × shares outstanding)
+  // Note: using price as proxy; assumes ~1M shares for each company
+  // This is an approximation without actual shares outstanding data
+  let totalMarketCap = 0;
+  let peValues = [];
+  let roeValues = [];
+  let priceChangeValues = [];
+
+  companies.forEach(co => {
+    if (co.latestPrice && co.latestPrice > 0) {
+      // Approximate market cap (price × estimated shares; using price as proxy)
+      totalMarketCap += co.latestPrice * 1000; // Approximation
+
+      // P/E ratio
+      const latest = co.annuals[0];
+      if (latest && latest.eps && latest.eps > 0) {
+        const pe = co.latestPrice / latest.eps;
+        if (pe > 0 && pe < 100) peValues.push(pe); // Filter outliers
+      }
+
+      // ROE
+      const roe = calcROE(latest);
+      if (roe !== null) roeValues.push(parseFloat(roe));
+
+      // Price change %
+      if (co.priceChangePct !== undefined) {
+        priceChangeValues.push(co.priceChangePct);
+      }
+    }
+  });
+
+  const avgPE = peValues.length > 0 ? (peValues.reduce((a, b) => a + b, 0) / peValues.length).toFixed(1) : null;
+  const avgROE = roeValues.length > 0 ? (roeValues.reduce((a, b) => a + b, 0) / roeValues.length).toFixed(1) : null;
+  const avgGrowth = priceChangeValues.length > 0 ? (priceChangeValues.reduce((a, b) => a + b, 0) / priceChangeValues.length).toFixed(1) : 0;
+
+  // Sector strength indicator based on average price change
+  let strength = 'mixed';
+  if (avgGrowth > 5) strength = 'up';
+  else if (avgGrowth < -5) strength = 'down';
+
+  return {
+    marketCap: totalMarketCap > 0 ? totalMarketCap : null,
+    avgPE,
+    avgROE,
+    avgGrowth: parseFloat(avgGrowth),
+    strength,
+    companyCount: companies.length,
+  };
+}
+
+function getNSEAverages() {
+  // Calculate NSE-wide average metrics for comparison
+  const allCompanies = Object.values(NSE_COMPANIES)
+    .filter(co => co.annuals && co.annuals.length > 0);
+
+  if (allCompanies.length === 0) return null;
+
+  let peValues = [];
+  let roeValues = [];
+  let priceChangeValues = [];
+
+  allCompanies.forEach(co => {
+    if (co.latestPrice && co.latestPrice > 0) {
+      const latest = co.annuals[0];
+      if (latest && latest.eps && latest.eps > 0) {
+        const pe = co.latestPrice / latest.eps;
+        if (pe > 0 && pe < 100) peValues.push(pe);
+      }
+
+      const roe = calcROE(latest);
+      if (roe !== null) roeValues.push(parseFloat(roe));
+
+      if (co.priceChangePct !== undefined) {
+        priceChangeValues.push(co.priceChangePct);
+      }
+    }
+  });
+
+  return {
+    avgPE: peValues.length > 0 ? (peValues.reduce((a, b) => a + b, 0) / peValues.length).toFixed(1) : null,
+    avgROE: roeValues.length > 0 ? (roeValues.reduce((a, b) => a + b, 0) / roeValues.length).toFixed(1) : null,
+    avgGrowth: priceChangeValues.length > 0 ? (priceChangeValues.reduce((a, b) => a + b, 0) / priceChangeValues.length).toFixed(1) : null,
+  };
+}
 
 function computeValuation(co) {
   const annuals = co.annuals || [];
@@ -1408,10 +1737,23 @@ function renderSectorOverview() {
     const companies = sectors[sec];
     const withFinancials = companies.filter(c => c.annuals && c.annuals.length > 0).length;
     const emoji = SECTOR_DISPLAY[sec]?.emoji || '📈';
+
+    // Calculate sector aggregates
+    const agg = calculateSectorAggregates(sec);
+    const strengthEmoji = agg.strength === 'up' ? '🟢' : agg.strength === 'down' ? '🔴' : '🟡';
+
+    // Build stats row
+    let statsHtml = '<div class="sector-card-stats">';
+    if (agg.avgPE) statsHtml += '<span class="stat-badge">P/E: ' + agg.avgPE + 'x</span>';
+    if (agg.avgROE) statsHtml += '<span class="stat-badge">ROE: ' + agg.avgROE + '%</span>';
+    statsHtml += '<span class="stat-badge strength-' + agg.strength + '">' + strengthEmoji + ' ' + (agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) + '%</span>';
+    statsHtml += '</div>';
+
     return '<div class="sector-card" onclick="renderSectorTable(\'' + sec.replace(/'/g, "\\'") + '\')">' +
       '<div class="sector-card-emoji">' + emoji + '</div>' +
       '<div class="sector-card-name">' + sec + '</div>' +
       '<div class="sector-card-count">' + companies.length + ' companies' + (withFinancials > 0 ? ' · ' + withFinancials + ' with financials' : '') + '</div>' +
+      statsHtml +
     '</div>';
   }).join('');
 }
@@ -1428,6 +1770,11 @@ function renderSectorTable(sectorName) {
   document.getElementById('sector-grid').style.display = 'none';
   document.getElementById('sector-table-wrap').classList.remove('hidden');
   document.getElementById('sector-table-title').textContent = sectorName;
+
+  // Reset comparison view
+  _showingComparison = false;
+  document.getElementById('sector-snapshot').classList.remove('hidden');
+  document.getElementById('sector-comparison').classList.add('hidden');
 
   const companies = Object.entries(NSE_COMPANIES)
     .filter(([, co]) => normalizeSector(co.sector) === sectorName)
@@ -1494,6 +1841,9 @@ function renderSectorTable(sectorName) {
       '<td class="num-col">' + (c.pat ? fmtNum(c.pat, c.units) : '—') + '</td>' +
     '</tr>';
   }).join('');
+
+  // Render snapshot
+  renderSectorSnapshot(sectorName);
 }
 
 function sortSectorTable(col, sectorName) {
@@ -1504,6 +1854,126 @@ function sortSectorTable(col, sectorName) {
     _sectorSortAsc = true;
   }
   renderSectorTable(sectorName);
+  renderSectorSnapshot(sectorName);
+}
+
+// ---- Sector Snapshot & Comparison ----
+let _showingComparison = false;
+
+function renderSectorSnapshot(sectorName) {
+  const agg = calculateSectorAggregates(sectorName);
+  const snapshotGrid = document.getElementById('snapshot-grid');
+  const snapshotDiv = document.getElementById('sector-snapshot');
+
+  if (!agg || agg.companyCount === 0) {
+    snapshotDiv.classList.add('hidden');
+    return;
+  }
+
+  snapshotDiv.classList.remove('hidden');
+
+  const cards = [];
+  if (agg.companyCount) {
+    cards.push({ label: 'Companies', value: agg.companyCount });
+  }
+  if (agg.avgPE) {
+    cards.push({ label: 'Avg P/E', value: agg.avgPE + 'x' });
+  }
+  if (agg.avgROE) {
+    cards.push({ label: 'Avg ROE', value: agg.avgROE + '%' });
+  }
+  if (agg.avgGrowth !== null) {
+    cards.push({ label: 'Avg Growth', value: (agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) + '%' });
+  }
+
+  snapshotGrid.innerHTML = cards.map(card => {
+    return '<div class="snapshot-card">' +
+      '<div class="snapshot-label-text">' + card.label + '</div>' +
+      '<div class="snapshot-value">' + card.value + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleSectorComparison() {
+  const compDiv = document.getElementById('sector-comparison');
+  const titleEl = document.getElementById('sector-table-title');
+  const sectorName = titleEl ? titleEl.textContent : null;
+
+  if (!sectorName) return;
+
+  _showingComparison = !_showingComparison;
+
+  if (_showingComparison) {
+    renderSectorComparison(sectorName);
+    compDiv.classList.remove('hidden');
+  } else {
+    compDiv.classList.add('hidden');
+  }
+}
+
+function renderSectorComparison(sectorName) {
+  const agg = calculateSectorAggregates(sectorName);
+  const nseAvg = getNSEAverages();
+  const compGrid = document.getElementById('comparison-grid');
+
+  if (!agg || !nseAvg) {
+    compGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-muted)">Insufficient data</div>';
+    return;
+  }
+
+  const comparisons = [];
+
+  // P/E Comparison
+  if (agg.avgPE && nseAvg.avgPE) {
+    const sectorPE = parseFloat(agg.avgPE);
+    const nsePE = parseFloat(nseAvg.avgPE);
+    const better = sectorPE < nsePE;
+    comparisons.push({
+      label: 'P/E Ratio',
+      sectorVal: agg.avgPE + 'x',
+      nseVal: nseAvg.avgPE + 'x',
+      better: better,
+    });
+  }
+
+  // ROE Comparison
+  if (agg.avgROE && nseAvg.avgROE) {
+    const sectorROE = parseFloat(agg.avgROE);
+    const nseROE = parseFloat(nseAvg.avgROE);
+    const better = sectorROE > nseROE;
+    comparisons.push({
+      label: 'ROE %',
+      sectorVal: agg.avgROE + '%',
+      nseVal: nseAvg.avgROE + '%',
+      better: better,
+    });
+  }
+
+  // Growth Comparison
+  if (agg.avgGrowth !== null && nseAvg.avgGrowth) {
+    const sectorGrowth = agg.avgGrowth;
+    const nseGrowth = parseFloat(nseAvg.avgGrowth);
+    const better = sectorGrowth > nseGrowth;
+    comparisons.push({
+      label: 'Growth %',
+      sectorVal: (sectorGrowth >= 0 ? '+' : '') + sectorGrowth.toFixed(1) + '%',
+      nseVal: (nseGrowth >= 0 ? '+' : '') + nseGrowth.toFixed(1) + '%',
+      better: better,
+    });
+  }
+
+  compGrid.innerHTML = comparisons.map(comp => {
+    const indicator = comp.better ? '▲' : '▼';
+    const cls = comp.better ? 'better' : 'worse';
+    return '<div class="comparison-card">' +
+      '<div class="comparison-label-text">' + comp.label + '</div>' +
+      '<div style="font-size:0.75rem;color:var(--text-muted);">' +
+        '<div><span style="font-size:0.65rem;">Sector:</span> ' + comp.sectorVal + '</div>' +
+        '<div><span style="font-size:0.65rem;">NSE Avg:</span> ' + comp.nseVal + '</div>' +
+      '</div>' +
+      '<div class="comparison-value ' + cls + '" style="font-size:0.8rem;">' + indicator + '</div>' +
+    '</div>';
+  }).join('');
 }
 
 function selectFromSector(ticker) {
@@ -1635,6 +2105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadMarketData();
   populateDropdown();
   renderMarketSummary();
+  initChartModalHandlers();
 
   document.getElementById('company-select').addEventListener('keydown', e => {
     if (e.key === 'Enter') loadCompany();
