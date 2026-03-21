@@ -595,19 +595,22 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
   } else if (gc) gc.innerHTML = '';
 
   // Add click handler to parent card to open chart in modal
-  const card = ctx.closest('.chart-card');
-  if (card) {
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', () => {
-      if (chartInstances[canvasId]) {
-        const chartConfig = {
-          type: 'bar',
-          data: { labels, datasets },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-        };
-        openChartModal(opts.title || 'Chart', chartConfig, opts.metadata || '');
-      }
-    });
+  const canvasElem = document.getElementById(canvasId);
+  if (canvasElem) {
+    const card = canvasElem.closest('.chart-card');
+    if (card) {
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', () => {
+        if (chartInstances[canvasId]) {
+          const chartConfig = {
+            type: 'bar',
+            data: { labels, datasets },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+          };
+          openChartModal(opts.title || 'Chart', chartConfig, opts.metadata || '');
+        }
+      });
+    }
   }
 }
 
