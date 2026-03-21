@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#050505" />
+  <title>NSE Insights — Admin Review</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ═══════════════════════════════════════════════════════════ */
+    /* ADMIN PDF VIEWER — Three-Panel Layout                       */
+    /* ═══════════════════════════════════════════════════════════ */
+
+    .admin-page {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+      padding-top: 60px; /* Account for fixed nav */
+    }
+
+    /* ── LEFT SIDEBAR (Hover-reveal company list) ────────────── */
+    .admin-sidebar {
+      position: fixed;
+      left: 0;
+      top: 60px;
+      bottom: 0;
+      width: 280px;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border-dim);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-out;
+      z-index: 100;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .admin-sidebar.revealed {
+      transform: translateX(0);
+    }
+
+    .sidebar-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border-dim);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .company-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.5rem;
+    }
+
+    .company-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0.9rem;
+      margin-bottom: 0.3rem;
+      background: var(--bg-base);
+      border: 1px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      font-size: 0.85rem;
+    }
+
+    .company-item:hover {
+      border-color: var(--accent-primary);
+      background: var(--bg-card);
+    }
+
+    .company-item.selected {
+      border-color: var(--accent-primary);
+      background: var(--bg-card);
+    }
+
+    .co-status {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .co-status.complete { color: var(--up); }
+    .co-status.partial { color: #ffb300; }
+    .co-status.missing { color: var(--down); }
+
+    .co-ticker {
+      font-weight: 700;
+      color: var(--text-primary);
+      font-family: var(--mono);
+      letter-spacing: 0.05em;
+    }
+
+    .co-name {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── SIDEBAR HOVER TRIGGER ────────────────────────────────── */
+    .sidebar-trigger {
+      position: fixed;
+      left: 0;
+      top: 60px;
+      width: 30px;
+      height: calc(100vh - 60px);
+      z-index: 99;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    /* ── CENTER PANEL (PDF Viewer) ───────────────────────────── */
+    .pdf-viewer {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      margin-left: 0;
+      background: var(--bg-base);
+      transition: margin-left 0.3s;
+    }
+
+    .pdf-viewer.sidebar-active {
+      margin-left: 280px;
+    }
+
+    /* PDF Toolbar */
+    .pdf-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-dim);
+      flex-wrap: wrap;
+      min-height: 50px;
+    }
+
+    .pdf-toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .pdf-toolbar button {
+      padding: 0.5rem 0.9rem;
+      background: var(--bg-base);
+      border: 1px solid var(--border-dim);
+      color: var(--text-primary);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .pdf-toolbar button:hover {
+      border-color: var(--accent-primary);
+      background: var(--bg-card);
+    }
+
+    .pdf-toolbar button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .page-counter {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-family: var(--mono);
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .pdf-breadcrumb {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-left: auto;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .pdf-breadcrumb span {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    /* PDF Container */
+    .pdf-container {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+
+    .pdf-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: white;
+    }
+
+    .pdf-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .pdf-empty-icon {
+      font-size: 3rem;
+      opacity: 0.3;
+    }
+
+    .pdf-empty-text {
+      font-size: 0.9rem;
+    }
+
+    /* ── RIGHT PANEL (Metadata) ──────────────────────────────── */
+    .metadata-panel {
+      width: 320px;
+      background: var(--bg-card);
+      border-left: 1px solid var(--border-dim);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .metadata-section {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-dim);
+    }
+
+    .metadata-section:last-child {
+      border-bottom: none;
+    }
+
+    .metadata-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .metadata-item {
+      margin-bottom: 0.75rem;
+    }
+
+    .metadata-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+    }
+
+    .metadata-value {
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      font-family: var(--mono);
+      word-break: break-word;
+    }
+
+    .company-info-badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      background: var(--bg-base);
+      border: 1px solid var(--border-dim);
+      border-radius: 4px;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 0.3rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════ */
+    /* RESPONSIVE DESIGN ─ Mobile/Tablet Adjustments              */
+    /* ═══════════════════════════════════════════════════════════ */
+
+    @media (max-width: 1200px) {
+      .metadata-panel {
+        display: none;
+      }
+      .pdf-viewer {
+        flex: 1;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .admin-page {
+        padding-top: 60px;
+      }
+
+      .admin-sidebar {
+        width: 100vw;
+        max-width: 280px;
+      }
+
+      .pdf-toolbar {
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        min-height: auto;
+      }
+
+      .pdf-toolbar-group {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+
+      .pdf-breadcrumb {
+        width: 100%;
+        margin: 0;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+
+      .page-counter {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .admin-sidebar {
+        width: 100vw;
+      }
+
+      .pdf-toolbar button {
+        padding: 0.4rem 0.7rem;
+        font-size: 0.75rem;
+      }
+
+      .metadata-panel {
+        width: 100%;
+        max-height: 200px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <nav class="topnav">
+    <div class="topnav-left">
+      <a href="landing.html" class="logo-link">
+        <span class="logo-dot"></span>
+        <span class="logo-text">NSE Insights</span>
+      </a>
+    </div>
+    <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 2rem;">
+      <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Admin Review Panel</span>
+    </div>
+    <div style="display: flex; gap: 1rem; align-items: center;">
+      <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode" onclick="toggleTheme()" style="margin-right: 0.5rem;">☀️</button>
+      <a href="index.html" style="color: var(--accent-primary); text-decoration: none; font-size: 0.9rem;">← Back to Dashboard</a>
+    </div>
+  </nav>
+
+  <!-- Main Admin Layout -->
+  <div class="admin-page">
+    <!-- Sidebar Trigger (hover area) -->
+    <div class="sidebar-trigger" id="sidebar-trigger" onmouseover="revealSidebar()" onmouseout="hideSidebarDelayed()"></div>
+
+    <!-- Left Sidebar -->
+    <div class="admin-sidebar" id="admin-sidebar">
+      <div class="sidebar-header">Companies</div>
+      <div class="company-list" id="company-list">
+        <!-- Populated by JavaScript -->
+      </div>
+    </div>
+
+    <!-- Center PDF Viewer -->
+    <div class="pdf-viewer" id="pdf-viewer">
+      <div class="pdf-toolbar">
+        <div class="pdf-toolbar-group">
+          <button id="pdf-prev-btn" onclick="prevPDFPage()" title="Previous page">← Prev</button>
+          <span class="page-counter" id="pdf-page-counter">—</span>
+          <button id="pdf-next-btn" onclick="nextPDFPage()" title="Next page">Next →</button>
+        </div>
+        <div class="pdf-toolbar-group" style="margin-left: auto;">
+          <button onclick="zoomPDF(1.2)" title="Zoom in">🔍+</button>
+          <button onclick="zoomPDF(0.8)" title="Zoom out">🔍−</button>
+          <button onclick="downloadPDF()" title="Download PDF">⬇ Download</button>
+        </div>
+        <div class="pdf-breadcrumb" id="pdf-breadcrumb">
+          <span>Select a company to view documents</span>
+        </div>
+      </div>
+
+      <div class="pdf-container" id="pdf-container">
+        <div class="pdf-empty">
+          <div class="pdf-empty-icon">📄</div>
+          <div class="pdf-empty-text">
+            <p>Hover over the left edge to reveal the company list</p>
+            <p style="font-size: 0.8rem; margin-top: 0.5rem;">Click a company to view its financial documents</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Metadata Panel (Hidden on mobile) -->
+    <div class="metadata-panel" id="metadata-panel">
+      <div class="metadata-section">
+        <div class="metadata-title">Company Info</div>
+        <div class="metadata-item">
+          <div class="metadata-label">Name</div>
+          <div class="metadata-value" id="meta-company-name">—</div>
+        </div>
+        <div class="metadata-item">
+          <div class="metadata-label">Ticker</div>
+          <div class="metadata-value" id="meta-company-ticker">—</div>
+        </div>
+        <div class="metadata-item">
+          <div class="metadata-label">Sector</div>
+          <div class="metadata-value" id="meta-company-sector">—</div>
+          <div class="company-info-badge" id="meta-data-status">Checking…</div>
+        </div>
+      </div>
+
+      <div class="metadata-section">
+        <div class="metadata-title">Document Info</div>
+        <div class="metadata-item">
+          <div class="metadata-label">Report Type</div>
+          <div class="metadata-value" id="meta-doc-type">—</div>
+        </div>
+        <div class="metadata-item">
+          <div class="metadata-label">Period</div>
+          <div class="metadata-value" id="meta-doc-period">—</div>
+        </div>
+        <div class="metadata-item">
+          <div class="metadata-label">Total Pages</div>
+          <div class="metadata-value" id="meta-doc-pages">—</div>
+        </div>
+      </div>
+
+      <div class="metadata-section" id="meta-financials-section">
+        <div class="metadata-title">Key Figures (Extract)</div>
+        <div id="meta-financials-content">
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Loading…</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="data.js?v=5"></script>
+  <script src="nse_tickers.js"></script>
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // ADMIN PDF VIEWER — JavaScript Logic
+    // ═══════════════════════════════════════════════════════════
+
+    let currentCompany = null;
+    let currentPDFUrl = null;
+    let sidebarHoverTimer = null;
+    let pdfCurrentPage = 1;
+    let pdfTotalPages = 1;
+
+    // ── Sidebar Hover Management ──────────────────────────────
+    function revealSidebar() {
+      clearTimeout(sidebarHoverTimer);
+      sidebarHoverTimer = setTimeout(() => {
+        document.getElementById('admin-sidebar').classList.add('revealed');
+        document.getElementById('pdf-viewer').classList.add('sidebar-active');
+      }, 1000); // 1 second delay
+    }
+
+    function hideSidebarDelayed() {
+      clearTimeout(sidebarHoverTimer);
+      sidebarHoverTimer = setTimeout(() => {
+        document.getElementById('admin-sidebar').classList.remove('revealed');
+        document.getElementById('pdf-viewer').classList.remove('sidebar-active');
+      }, 200); // Allow brief delay before hiding
+    }
+
+    // Keep sidebar visible when hovering over it
+    document.addEventListener('DOMContentLoaded', () => {
+      const sidebar = document.getElementById('admin-sidebar');
+      if (sidebar) {
+        sidebar.addEventListener('mouseover', () => clearTimeout(sidebarHoverTimer));
+        sidebar.addEventListener('mouseout', hideSidebarDelayed);
+      }
+    });
+
+    // ── Company List Population ───────────────────────────────
+    function populateCompanyList() {
+      const list = document.getElementById('company-list');
+      if (!list || !NSE_COMPANIES) return;
+
+      const sortedCompanies = Object.values(NSE_COMPANIES).sort((a, b) =>
+        (a.name || '').localeCompare(b.name || '')
+      );
+
+      list.innerHTML = sortedCompanies.map(company => {
+        const status = company.pdf ? 'complete' : 'missing'; // Simple status for now
+        const statusEmoji = { complete: '✓', partial: '⚠', missing: '✗' }[status];
+
+        return `
+          <div class="company-item" onclick="selectCompany('${company.ticker}')">
+            <span class="co-status ${status}">${statusEmoji}</span>
+            <span class="co-ticker">${company.ticker}</span>
+            <span class="co-name">${company.name || ''}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── Company Selection ────────────────────────────────────
+    function selectCompany(ticker) {
+      currentCompany = NSE_COMPANIES[ticker];
+      if (!currentCompany) return;
+
+      // Update metadata panel
+      document.getElementById('meta-company-name').textContent = currentCompany.name || '—';
+      document.getElementById('meta-company-ticker').textContent = ticker;
+      document.getElementById('meta-company-sector').textContent = currentCompany.sector || '—';
+      document.getElementById('meta-data-status').textContent = currentCompany.pdf ? '✓ Data Available' : '⚠ Incomplete';
+
+      // Update breadcrumb
+      document.getElementById('pdf-breadcrumb').innerHTML = `
+        <span>${currentCompany.name}</span>
+        <span>›</span>
+        <span>Annual Report 2024</span>
+      `;
+
+      // Load PDF (for now using iframe fallback)
+      loadPDF(ticker);
+
+      // Update selected state in list
+      document.querySelectorAll('.company-item').forEach(el => {
+        el.classList.remove('selected');
+        if (el.textContent.includes(ticker)) {
+          el.classList.add('selected');
+        }
+      });
+    }
+
+    // ── PDF Loading ──────────────────────────────────────────
+    function loadPDF(ticker) {
+      const company = NSE_COMPANIES[ticker];
+      if (!company || !company.pdf) {
+        showNoPDFMessage();
+        return;
+      }
+
+      currentPDFUrl = company.pdf;
+      const container = document.getElementById('pdf-container');
+
+      // For now, use iframe for PDF viewing
+      // TODO: Implement PDF.js for more advanced features
+      container.innerHTML = `
+        <iframe class="pdf-frame" src="${currentPDFUrl}#toolbar=0&view=FitH" title="PDF Viewer"></iframe>
+      `;
+
+      // Update page counter (placeholder)
+      document.getElementById('pdf-page-counter').textContent = 'Page 1 / 73';
+      document.getElementById('meta-doc-pages').textContent = '73';
+      document.getElementById('meta-doc-type').textContent = 'Annual Report';
+      document.getElementById('meta-doc-period').textContent = '2024';
+    }
+
+    function showNoPDFMessage() {
+      const container = document.getElementById('pdf-container');
+      container.innerHTML = `
+        <div class="pdf-empty">
+          <div class="pdf-empty-icon">📄</div>
+          <div class="pdf-empty-text">
+            <p>No PDF available for ${currentCompany.name}</p>
+            <p style="font-size: 0.8rem; margin-top: 0.5rem;">Please check back soon</p>
+          </div>
+        </div>
+      `;
+      document.getElementById('pdf-page-counter').textContent = '—';
+    }
+
+    // ── PDF Navigation ──────────────────────────────────────
+    function nextPDFPage() {
+      if (pdfCurrentPage < pdfTotalPages) {
+        pdfCurrentPage++;
+        updatePDFPage();
+      }
+    }
+
+    function prevPDFPage() {
+      if (pdfCurrentPage > 1) {
+        pdfCurrentPage--;
+        updatePDFPage();
+      }
+    }
+
+    function updatePDFPage() {
+      document.getElementById('pdf-page-counter').textContent =
+        `Page ${pdfCurrentPage} / ${pdfTotalPages}`;
+      // TODO: Implement actual page navigation with PDF.js
+    }
+
+    function zoomPDF(scale) {
+      const iframe = document.querySelector('.pdf-frame');
+      if (!iframe) return;
+      // TODO: Implement zoom with PDF.js
+    }
+
+    function downloadPDF() {
+      if (!currentPDFUrl) return;
+      const a = document.createElement('a');
+      a.href = currentPDFUrl;
+      a.download = `${currentCompany.ticker}_Annual_Report.pdf`;
+      a.click();
+    }
+
+    // ── Theme Toggle ────────────────────────────────────────
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle('light');
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.textContent = isLight ? '🌙' : '☀️';
+      try { localStorage.setItem('nse-theme', isLight ? 'light' : 'dark'); } catch(e) {}
+    }
+
+    function initTheme() {
+      let saved = null;
+      try { saved = localStorage.getItem('nse-theme'); } catch(e) {}
+      if (saved === 'light') {
+        document.body.classList.add('light');
+        const btn = document.getElementById('theme-toggle');
+        if (btn) btn.textContent = '🌙';
+      }
+    }
+
+    // ── Initialize on page load ──────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      populateCompanyList();
+    });
+  </script>
+</body>
+</html>
