@@ -599,15 +599,17 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
   if (canvasElement) {
     canvasElement.style.cursor = 'pointer';
     canvasElement.addEventListener('click', () => {
-      openChartModal(
-        opts.title || 'Chart',
-        {
-          type: 'bar',
-          data: { labels, datasets },
-          options: chartInstances[canvasId].options
-        },
-        opts.metadata || ''
-      );
+      if (chartInstances[canvasId]) {
+        openChartModal(
+          opts.title || 'Chart',
+          {
+            type: 'bar',
+            data: { labels, datasets },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+          },
+          opts.metadata || ''
+        );
+      }
     });
   }
 }
@@ -813,7 +815,7 @@ function renderPriceChart(ticker, range) {
           {
             type: 'line',
             data: _priceChartInstance.data,
-            options: _priceChartInstance.options
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
           },
           'Last ' + (_currentRange || '1Y')
         );
