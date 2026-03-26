@@ -9,10 +9,10 @@
   <meta name="theme-color" content="#050505" />
   <meta name="description" content="NSE Insights - Kenya stock market financial data and analysis dashboard" />
   <title>NSE Insights — Dashboard</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=6" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script src="tier-access.js?v=1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.min.js"></script>
 </head>
 <body>
 
@@ -35,7 +35,6 @@
     </div>
     <div class="topnav-right nav-desktop">
       <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode" onclick="toggleTheme()">☀️</button>
-      <span class="tier-badge" id="tier-badge" title="Your current subscription tier">Free</span>
       <a href="admin.html" class="admin-padlock" title="Admin Review">🔒</a>
       <a href="login.html" class="btn-login">Log in</a>
       <a href="login.html#signup" class="btn-getstarted">Get started</a>
@@ -64,11 +63,23 @@
   <!-- Search Bar -->
   <div class="search-bar-wrap">
     <div class="search-bar">
-      <select id="company-select">
-        <option value="">— Select Company —</option>
-      </select>
+      <div class="company-search-container">
+        <input
+          id="company-search-input"
+          type="text"
+          placeholder="Search by company name or ticker..."
+          class="company-search-input"
+          autocomplete="off"
+        />
+        <button id="search-dropdown-btn" class="search-dropdown-btn" title="Browse all companies" onclick="toggleSearchDropdown()">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 3.5L5 7L8.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div id="company-suggestions" class="company-suggestions-dropdown"></div>
+      </div>
       <span class="exchange-tag">NSE</span>
-      <button id="search-btn" onclick="loadCompany()">Search</button>
+      <button id="search-btn" onclick="loadCompanyFromSearch()" title="Search">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.8"/><path d="M10 10L14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
     </div>
     <div class="view-toggle">
       <button class="view-btn active" id="btn-companies" onclick="showView('companies')">Companies</button>
@@ -145,14 +156,31 @@
                 <div class="price-stat"><span>Volume</span><span id="price-vol">—</span></div>
               </div>
             </div>
-            <div class="price-range-btns" id="price-range-btns">
-              <button class="range-btn" data-range="1M">1M</button>
-              <button class="range-btn" data-range="3M">3M</button>
-              <button class="range-btn" data-range="6M">6M</button>
-              <button class="range-btn active" data-range="1Y">1Y</button>
-              <button class="range-btn" data-range="3Y">3Y</button>
-              <button class="range-btn" data-range="5Y">5Y</button>
-              <button class="range-btn" data-range="ALL">ALL</button>
+            <div class="price-chart-controls">
+              <div class="price-range-btns" id="price-range-btns">
+                <button class="range-btn" data-range="1M">1M</button>
+                <button class="range-btn" data-range="3M">3M</button>
+                <button class="range-btn" data-range="6M">6M</button>
+                <button class="range-btn active" data-range="1Y">1Y</button>
+                <button class="range-btn" data-range="3Y">3Y</button>
+                <button class="range-btn" data-range="5Y">5Y</button>
+                <button class="range-btn" data-range="ALL">ALL</button>
+              </div>
+              <div class="chart-type-toggle" id="chart-type-toggle">
+                <button class="chart-type-btn active" id="btn-chart-line" onclick="setPriceChartType('line')" title="Line chart">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><polyline points="1,11 5,5 8,8 13,2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+                </button>
+                <button class="chart-type-btn" id="btn-chart-candle" onclick="setPriceChartType('candle')" title="Candlestick">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <line x1="3" y1="1" x2="3" y2="3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <rect x="1.5" y="3" width="3" height="5" rx="0.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                    <line x1="3" y1="8" x2="3" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="11" y1="3" x2="11" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <rect x="9.5" y="5" width="3" height="4" rx="0.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                    <line x1="11" y1="9" x2="11" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           <div class="price-chart-wrap"><canvas id="chart-price"></canvas></div>
@@ -293,7 +321,7 @@
     <div class="footer-right">© 2026 NSE Insights</div>
   </footer>
 
-  <script src="data.js?v=5"></script>
-  <script src="app.js?v=14"></script>
+  <script src="data.js?v=8"></script>
+  <script src="app.js?v=27"></script>
 </body>
 </html>

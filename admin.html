@@ -20,7 +20,7 @@
       padding-top: 60px; /* Account for fixed nav */
     }
 
-    /* ── LEFT SIDEBAR (Hover-reveal company list) ────────────── */
+    /* ── LEFT SIDEBAR (Always visible) ──────────────────────── */
     .admin-sidebar {
       position: fixed;
       left: 0;
@@ -31,14 +31,7 @@
       border-right: 1px solid var(--border-dim);
       display: flex;
       flex-direction: column;
-      transform: translateX(-100%);
-      transition: transform 0.3s ease-out;
       z-index: 100;
-      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
-    }
-
-    .admin-sidebar.revealed {
-      transform: translateX(0);
     }
 
     .sidebar-header {
@@ -112,30 +105,13 @@
       white-space: nowrap;
     }
 
-    /* ── SIDEBAR HOVER TRIGGER ────────────────────────────────── */
-    .sidebar-trigger {
-      position: fixed;
-      left: 0;
-      top: 60px;
-      width: 30px;
-      height: calc(100vh - 60px);
-      z-index: 99;
-      background: transparent;
-      cursor: pointer;
-    }
-
     /* ── CENTER PANEL (PDF Viewer) ───────────────────────────── */
     .pdf-viewer {
       flex: 1;
       display: flex;
       flex-direction: column;
-      margin-left: 0;
-      background: var(--bg-base);
-      transition: margin-left 0.3s;
-    }
-
-    .pdf-viewer.sidebar-active {
       margin-left: 280px;
+      background: var(--bg-base);
     }
 
     /* PDF Toolbar */
@@ -217,6 +193,7 @@
       height: 100%;
       border: none;
       background: white;
+      display: block;
     }
 
     .pdf-empty {
@@ -319,8 +296,11 @@
       }
 
       .admin-sidebar {
-        width: 100vw;
-        max-width: 280px;
+        width: 240px;
+      }
+
+      .pdf-viewer {
+        margin-left: 240px;
       }
 
       .pdf-toolbar {
@@ -349,7 +329,11 @@
 
     @media (max-width: 480px) {
       .admin-sidebar {
-        width: 100vw;
+        width: 180px;
+      }
+
+      .pdf-viewer {
+        margin-left: 180px;
       }
 
       .pdf-toolbar button {
@@ -385,9 +369,6 @@
 
   <!-- Main Admin Layout -->
   <div class="admin-page">
-    <!-- Sidebar Trigger (hover area) -->
-    <div class="sidebar-trigger" id="sidebar-trigger" onmouseover="revealSidebar()" onmouseout="hideSidebarDelayed()"></div>
-
     <!-- Left Sidebar -->
     <div class="admin-sidebar" id="admin-sidebar">
       <div class="sidebar-header">Companies</div>
@@ -407,6 +388,7 @@
         <div class="pdf-toolbar-group" style="margin-left: auto;">
           <button onclick="zoomPDF(1.2)" title="Zoom in">🔍+</button>
           <button onclick="zoomPDF(0.8)" title="Zoom out">🔍−</button>
+          <button onclick="openPDFTab()" title="Open in new tab" style="background:var(--accent-primary);color:#fff;border-color:var(--accent-primary);">↗ Open</button>
           <button onclick="downloadPDF()" title="Download PDF">⬇ Download</button>
         </div>
         <div class="pdf-breadcrumb" id="pdf-breadcrumb">
@@ -418,7 +400,7 @@
         <div class="pdf-empty">
           <div class="pdf-empty-icon">📄</div>
           <div class="pdf-empty-text">
-            <p>Hover over the left edge to reveal the company list</p>
+            <p>Select a company from the left panel</p>
             <p style="font-size: 0.8rem; margin-top: 0.5rem;">Click a company to view its financial documents</p>
           </div>
         </div>
@@ -440,7 +422,6 @@
         <div class="metadata-item">
           <div class="metadata-label">Sector</div>
           <div class="metadata-value" id="meta-company-sector">—</div>
-          <div class="company-info-badge" id="meta-data-status">Checking…</div>
         </div>
       </div>
 
@@ -469,45 +450,27 @@
     </div>
   </div>
 
+  <!-- PDF.js — canvas-based renderer, works in all iframe contexts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <!-- Scripts -->
-  <script src="data.js?v=5"></script>
+  <script src="data.js?v=8"></script>
   <script src="nse_tickers.js"></script>
   <script>
     // ═══════════════════════════════════════════════════════════
     // ADMIN PDF VIEWER — JavaScript Logic
     // ═══════════════════════════════════════════════════════════
 
+    // PDF.js setup
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
     let currentCompany = null;
     let currentPDFUrl = null;
-    let sidebarHoverTimer = null;
     let pdfCurrentPage = 1;
     let pdfTotalPages = 1;
-
-    // ── Sidebar Hover Management ──────────────────────────────
-    function revealSidebar() {
-      clearTimeout(sidebarHoverTimer);
-      sidebarHoverTimer = setTimeout(() => {
-        document.getElementById('admin-sidebar').classList.add('revealed');
-        document.getElementById('pdf-viewer').classList.add('sidebar-active');
-      }, 1000); // 1 second delay
-    }
-
-    function hideSidebarDelayed() {
-      clearTimeout(sidebarHoverTimer);
-      sidebarHoverTimer = setTimeout(() => {
-        document.getElementById('admin-sidebar').classList.remove('revealed');
-        document.getElementById('pdf-viewer').classList.remove('sidebar-active');
-      }, 200); // Allow brief delay before hiding
-    }
-
-    // Keep sidebar visible when hovering over it
-    document.addEventListener('DOMContentLoaded', () => {
-      const sidebar = document.getElementById('admin-sidebar');
-      if (sidebar) {
-        sidebar.addEventListener('mouseover', () => clearTimeout(sidebarHoverTimer));
-        sidebar.addEventListener('mouseout', hideSidebarDelayed);
-      }
-    });
+    let _pdfDoc = null;
+    let _pdfScale = 1.5;
+    let _renderTask = null;
 
     // ── Company List Population ───────────────────────────────
     function populateCompanyList() {
@@ -518,18 +481,12 @@
         (a.name || '').localeCompare(b.name || '')
       );
 
-      list.innerHTML = sortedCompanies.map(company => {
-        const status = company.pdf ? 'complete' : 'missing'; // Simple status for now
-        const statusEmoji = { complete: '✓', partial: '⚠', missing: '✗' }[status];
-
-        return `
+      list.innerHTML = sortedCompanies.map(company => `
           <div class="company-item" onclick="selectCompany('${company.ticker}')">
-            <span class="co-status ${status}">${statusEmoji}</span>
             <span class="co-ticker">${company.ticker}</span>
             <span class="co-name">${company.name || ''}</span>
           </div>
-        `;
-      }).join('');
+        `).join('');
     }
 
     // ── Company Selection ────────────────────────────────────
@@ -541,7 +498,6 @@
       document.getElementById('meta-company-name').textContent = currentCompany.name || '—';
       document.getElementById('meta-company-ticker').textContent = ticker;
       document.getElementById('meta-company-sector').textContent = currentCompany.sector || '—';
-      document.getElementById('meta-data-status').textContent = currentCompany.pdf ? '✓ Data Available' : '⚠ Incomplete';
 
       // Update breadcrumb
       document.getElementById('pdf-breadcrumb').innerHTML = `
@@ -563,27 +519,141 @@
     }
 
     // ── PDF Loading ──────────────────────────────────────────
+    // Fetches directory listing from Python http.server, parses PDF links,
+    // shows a file picker, and loads the selected file.
+    let _docFiles = []; // current company's document list
+
     function loadPDF(ticker) {
       const company = NSE_COMPANIES[ticker];
-      if (!company || !company.pdf) {
-        showNoPDFMessage();
-        return;
-      }
+      if (!company) { showNoPDFMessage(); return; }
 
-      currentPDFUrl = company.pdf;
       const container = document.getElementById('pdf-container');
+      container.innerHTML = `<div class="pdf-empty"><div class="pdf-empty-icon">⏳</div><div class="pdf-empty-text"><p>Scanning documents folder…</p></div></div>`;
 
-      // For now, use iframe for PDF viewing
-      // TODO: Implement PDF.js for more advanced features
+      const dirUrl = `data/companies/${ticker}/documents/`;
+
+      fetch(dirUrl)
+        .then(res => res.text())
+        .then(html => {
+          // Parse directory listing HTML — extract .pdf hrefs
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const links = Array.from(doc.querySelectorAll('a[href$=".pdf"]'));
+          const files = links
+            .map(a => decodeURIComponent(a.getAttribute('href')))
+            .filter(f => f && !f.startsWith('/') && f.endsWith('.pdf'))
+            .sort((a, b) => b.localeCompare(a)); // newest first (reverse alpha ≈ newest year)
+
+          if (files.length === 0) {
+            // Fall back to legacy company.pdf path
+            if (company.pdf) {
+              openPDF(company.pdf, company.name, '—', company);
+            } else {
+              showNoPDFMessage();
+            }
+            return;
+          }
+
+          _docFiles = files;
+          // Auto-load the first (most recent) file
+          openPDF(dirUrl + files[0], files[0], extractYear(files[0]), company);
+          // Show file picker in breadcrumb area
+          renderFilePicker(files, dirUrl, company);
+        })
+        .catch(() => {
+          // Directory listing not available — fall back to named candidates
+          if (company.pdf) {
+            openPDF(company.pdf, company.name, '—', company);
+          } else {
+            showNoPDFMessage();
+          }
+        });
+    }
+
+    function extractYear(filename) {
+      const m = filename.match(/(\d{4})/g);
+      if (!m) return '—';
+      // Return the last 4-digit year found (usually at end of filename)
+      return m[m.length - 1];
+    }
+
+    function openPDF(url, filename, year, company) {
+      currentPDFUrl = url;
+      pdfCurrentPage = 1;
+      _pdfDoc = null;
+
+      const container = document.getElementById('pdf-container');
       container.innerHTML = `
-        <iframe class="pdf-frame" src="${currentPDFUrl}#toolbar=0&view=FitH" title="PDF Viewer"></iframe>
-      `;
+        <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding:1rem;box-sizing:border-box;">
+          <canvas id="pdf-canvas" style="max-width:100%;box-shadow:0 2px 16px rgba(0,0,0,0.3);"></canvas>
+        </div>`;
 
-      // Update page counter (placeholder)
-      document.getElementById('pdf-page-counter').textContent = 'Page 1 / 73';
-      document.getElementById('meta-doc-pages').textContent = '73';
+      document.getElementById('pdf-page-counter').textContent = 'Loading…';
+      document.getElementById('meta-doc-pages').textContent = '—';
       document.getElementById('meta-doc-type').textContent = 'Annual Report';
-      document.getElementById('meta-doc-period').textContent = '2024';
+      document.getElementById('meta-doc-period').textContent = year;
+      document.getElementById('pdf-breadcrumb').innerHTML =
+        `<span>${company.name}</span><span>›</span><span>${filename}</span>`;
+
+      pdfjsLib.getDocument(url).promise.then(pdf => {
+        _pdfDoc = pdf;
+        pdfTotalPages = pdf.numPages;
+        document.getElementById('meta-doc-pages').textContent = pdf.numPages;
+        renderPage(1);
+      }).catch(err => {
+        container.innerHTML = `
+          <div class="pdf-empty">
+            <div class="pdf-empty-icon">⚠️</div>
+            <div class="pdf-empty-text">
+              <p>Could not load PDF</p>
+              <p style="font-size:0.8rem;margin-top:0.5rem;">${err.message}</p>
+              <button onclick="openPDFTab()" style="margin-top:1rem;padding:0.6rem 1.2rem;background:var(--accent-primary);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:600;">↗ Open in new tab</button>
+            </div>
+          </div>`;
+      });
+    }
+
+    function renderPage(num) {
+      if (!_pdfDoc) return;
+      pdfCurrentPage = num;
+      document.getElementById('pdf-page-counter').textContent = `Page ${num} / ${pdfTotalPages}`;
+
+      _pdfDoc.getPage(num).then(page => {
+        const canvas = document.getElementById('pdf-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const viewport = page.getViewport({ scale: _pdfScale });
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        if (_renderTask) _renderTask.cancel();
+        _renderTask = page.render({ canvasContext: ctx, viewport });
+        _renderTask.promise.catch(() => {}); // ignore cancel errors
+      });
+    }
+
+    function openPDFTab() {
+      if (currentPDFUrl) window.open(currentPDFUrl, '_blank');
+    }
+
+    function renderFilePicker(files, dirUrl, company) {
+      // Inject a compact file-select dropdown into the toolbar
+      let picker = document.getElementById('pdf-file-picker');
+      if (!picker) {
+        const toolbar = document.querySelector('.pdf-toolbar-group');
+        picker = document.createElement('select');
+        picker.id = 'pdf-file-picker';
+        picker.style.cssText = 'padding:0.4rem 0.6rem;background:var(--bg-base);border:1px solid var(--border-dim);color:var(--text-primary);border-radius:6px;font-size:0.8rem;max-width:320px;cursor:pointer;';
+        toolbar.appendChild(picker);
+      }
+      // Always refresh the handler so it captures the current company's dirUrl
+      picker.onchange = function() {
+        const f = this.value;
+        openPDF(dirUrl + f, f, extractYear(f), company);
+      };
+      picker.innerHTML = files.map(f =>
+        `<option value="${f}">${f.replace(/_/g,' ').replace('.pdf','')}</option>`
+      ).join('');
+      picker.value = files[0];
     }
 
     function showNoPDFMessage() {
@@ -602,29 +672,17 @@
 
     // ── PDF Navigation ──────────────────────────────────────
     function nextPDFPage() {
-      if (pdfCurrentPage < pdfTotalPages) {
-        pdfCurrentPage++;
-        updatePDFPage();
-      }
+      if (_pdfDoc && pdfCurrentPage < pdfTotalPages) renderPage(pdfCurrentPage + 1);
     }
 
     function prevPDFPage() {
-      if (pdfCurrentPage > 1) {
-        pdfCurrentPage--;
-        updatePDFPage();
-      }
+      if (_pdfDoc && pdfCurrentPage > 1) renderPage(pdfCurrentPage - 1);
     }
 
-    function updatePDFPage() {
-      document.getElementById('pdf-page-counter').textContent =
-        `Page ${pdfCurrentPage} / ${pdfTotalPages}`;
-      // TODO: Implement actual page navigation with PDF.js
-    }
-
-    function zoomPDF(scale) {
-      const iframe = document.querySelector('.pdf-frame');
-      if (!iframe) return;
-      // TODO: Implement zoom with PDF.js
+    function zoomPDF(factor) {
+      if (!_pdfDoc) return;
+      _pdfScale = Math.min(Math.max(_pdfScale * factor, 0.5), 4.0);
+      renderPage(pdfCurrentPage);
     }
 
     function downloadPDF() {

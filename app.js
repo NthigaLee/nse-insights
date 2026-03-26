@@ -7,41 +7,7 @@
 let activeCompany = null;
 let chartInstances = {};
 let NSE_PRICES = {};
-
-// ---- Tier Access Management ----
-function initTierUI() {
-  const badge = document.getElementById('tier-badge');
-  if (badge) {
-    const tier = tierAccess.userTier;
-    const tierInfo = tierAccess.getTierInfo();
-    badge.textContent = tierInfo.name;
-    badge.className = `tier-badge ${tier}`;
-    badge.title = tierInfo.description;
-  }
-}
-
-function updateTierUI() {
-  initTierUI();
-
-  // Update max companies display if admin section is visible
-  const adminLink = document.querySelector('.admin-padlock');
-  if (adminLink && tierAccess.canAccessAdmin()) {
-    adminLink.style.opacity = '1';
-  } else if (adminLink) {
-    adminLink.style.opacity = '0.3';
-  }
-
-  // Update valuation panel visibility
-  const valuationPanel = document.getElementById('valuation-panel');
-  if (valuationPanel && !tierAccess.canViewValuation()) {
-    valuationPanel.classList.add('hidden');
-  }
-}
-
-// Listen for tier changes
-window.addEventListener('tierChanged', () => {
-  updateTierUI();
-});
+let _priceChartType = 'line'; // 'line' | 'candle'
 
 // ---- Sector Templates ----
 // Each sector defines which charts to show, in which rows,
@@ -497,6 +463,12 @@ function sectorEmoji(sector) {
 // ---- Chart.js Global Defaults ----
 Chart.defaults.color = '#707070';
 Chart.defaults.borderColor = 'rgba(0,230,118,0.08)';
+// ---- Theme-aware chart grid colour ----
+function chartGridColor() {
+  return document.body.classList.contains('light')
+    ? 'rgba(0, 0, 0, 0.22)'
+    : 'rgba(255, 255, 255, 0.08)';
+}
 Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
 Chart.defaults.font.size = 11;
 
@@ -580,7 +552,7 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
       scales: {
         x: { grid: { display: false }, ticks: { color: '#5a6a7e', font: { size: 10, weight: 500 } } },
         y: {
-          grid: { color: 'rgba(30, 45, 61, 0.6)', drawTicks: false },
+          grid: { color: chartGridColor(), drawTicks: false },
           border: { display: false },
           ticks: {
             color: '#5a6a7e', font: { size: 10 },
@@ -628,25 +600,6 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
     if (c5 !== null) h += pill('5Y', c5);
     gc.innerHTML = h;
   } else if (gc) gc.innerHTML = '';
-
-  // Add click handler to parent card to open chart in modal
-  const canvasElem = document.getElementById(canvasId);
-  if (canvasElem) {
-    const card = canvasElem.closest('.chart-card');
-    if (card) {
-      card.style.cursor = 'pointer';
-      card.addEventListener('click', () => {
-        if (chartInstances[canvasId]) {
-          const chartConfig = {
-            type: 'bar',
-            data: { labels, datasets },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-          };
-          openChartModal(opts.title || 'Chart', chartConfig, opts.metadata || '');
-        }
-      });
-    }
-  }
 }
 
 function barColors(n) {
@@ -699,6 +652,49 @@ function buildChartGrid(template) {
 // ---- Price Chart ----
 let _priceChartInstance = null;
 let _currentRange = '1Y';
+
+// Aggregate weekly close prices into bi-weekly or monthly OHLC candles.
+// NSE data is one close per week, so we need to group multiple weeks together
+// to get meaningful open/high/low/close spread on each candle.
+function aggregateToCandles(prices, range) {
+  // Short ranges: group every 2 weeks → ~2–6 candles
+  // Long ranges: group by calendar month → 6–60 candles
+  const useBiWeekly = ['1M', '3M'].includes(range);
+  const buckets = new Map();
+
+  prices.forEach(([ts, close]) => {
+    const d = new Date(ts);
+    let key;
+    if (useBiWeekly) {
+      // Week-of-year floored to nearest even number
+      const startOfYear = new Date(d.getFullYear(), 0, 1);
+      const weekOfYear = Math.floor((d - startOfYear) / (7 * 24 * 3600 * 1000));
+      key = d.getFullYear() * 1000 + Math.floor(weekOfYear / 2);
+    } else {
+      // Calendar month
+      key = d.getFullYear() * 100 + d.getMonth();
+    }
+    if (!buckets.has(key)) buckets.set(key, { lastTs: ts, closes: [] });
+    const b = buckets.get(key);
+    b.closes.push(close);
+    b.lastTs = ts;
+  });
+
+  return Array.from(buckets.values()).map(b => ({
+    x: b.lastTs,
+    o: b.closes[0],
+    h: Math.max(...b.closes),
+    l: Math.min(...b.closes),
+    c: b.closes[b.closes.length - 1],
+  }));
+}
+
+function setPriceChartType(type) {
+  _priceChartType = type;
+  document.getElementById('btn-chart-line')?.classList.toggle('active', type === 'line');
+  document.getElementById('btn-chart-candle')?.classList.toggle('active', type === 'candle');
+  if (activeCompany) renderPriceChart(activeCompany.ticker, _currentRange);
+}
 
 function renderPriceChart(ticker, range) {
   range = range || _currentRange;
@@ -755,105 +751,128 @@ function renderPriceChart(ticker, range) {
     document.getElementById('price-vol').textContent = '—';
   }
 
-  // Build chart data
-  const chartData = filtered.map(p => ({ x: p[0], y: p[1] }));
-
   const ctx = document.getElementById('chart-price');
   if (_priceChartInstance) _priceChartInstance.destroy();
 
-  const gradient = ctx.getContext('2d');
-  const gradientFill = gradient.createLinearGradient(0, 0, 0, 320);
-  if (isUp) {
-    gradientFill.addColorStop(0, 'rgba(0, 230, 118, 0.2)');
-    gradientFill.addColorStop(1, 'rgba(0, 230, 118, 0.0)');
-  } else {
-    gradientFill.addColorStop(0, 'rgba(255, 68, 68, 0.2)');
-    gradientFill.addColorStop(1, 'rgba(255, 68, 68, 0.0)');
-  }
-
-  _priceChartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      datasets: [{
-        data: chartData,
-        borderColor: isUp ? '#00e676' : '#ff4444',
-        borderWidth: 2,
-        fill: true,
-        backgroundColor: gradientFill,
-        pointRadius: 0,
-        pointHitRadius: 8,
-        tension: 0.1,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#111111',
-          borderColor: 'rgba(255,255,255,0.05)',
-          borderWidth: 1,
-          padding: 12,
-          titleFont: { size: 12, weight: 'bold' },
-          bodyFont: { size: 13 },
-          cornerRadius: 10,
-          displayColors: false,
-          callbacks: {
-            title: (items) => {
-              if (!items.length) return '';
-              return new Date(items[0].parsed.x).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-            },
-            label: (item) => 'KES ' + item.parsed.y.toFixed(2),
-          }
-        }
+  // Shared scale config
+  const sharedScales = {
+    x: {
+      type: 'time',
+      time: {
+        tooltipFormat: 'dd MMM yyyy',
+        displayFormats: { day: 'dd MMM', week: 'dd MMM', month: 'MMM yy', quarter: 'MMM yy', year: 'yyyy' }
       },
-      scales: {
-        x: {
-          type: 'time',
-          time: {
-            tooltipFormat: 'dd MMM yyyy',
-            displayFormats: {
-              day: 'dd MMM',
-              week: 'dd MMM',
-              month: 'MMM yy',
-              quarter: 'MMM yy',
-              year: 'yyyy',
-            }
-          },
-          grid: { display: false },
-          ticks: { color: '#5a6a7e', font: { size: 10, weight: 500 }, maxTicksLimit: 8 },
-          border: { display: false },
-        },
-        y: {
-          grid: { color: 'rgba(30, 45, 61, 0.6)', drawTicks: false },
-          border: { display: false },
-          ticks: {
-            color: '#5a6a7e',
-            font: { size: 10 },
-            callback: (v) => v.toFixed(v >= 100 ? 0 : 2),
-          },
-        }
-      }
+      grid: { display: false },
+      ticks: { color: '#5a6a7e', font: { size: 10, weight: 500 }, maxTicksLimit: 8 },
+      border: { display: false },
+    },
+    y: {
+      grid: { color: chartGridColor(), drawTicks: false },
+      border: { display: false },
+      ticks: { color: '#5a6a7e', font: { size: 10 }, callback: (v) => v.toFixed(v >= 100 ? 0 : 2) },
     }
-  });
+  };
 
-  // Add click handler to price chart
-  const priceChartCanvas = document.getElementById('chart-price');
-  if (priceChartCanvas) {
-    priceChartCanvas.style.cursor = 'pointer';
-    priceChartCanvas.addEventListener('click', () => {
-      if (_priceChartInstance) {
-        openChartModal(
-          ticker + ' - Price Chart',
-          {
-            type: 'line',
-            data: _priceChartInstance.data,
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-          },
-          'Last ' + (_currentRange || '1Y')
-        );
+  const sharedTooltip = {
+    backgroundColor: '#111111',
+    borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    padding: 12,
+    titleFont: { size: 12, weight: 'bold' },
+    bodyFont: { size: 13 },
+    cornerRadius: 10,
+    displayColors: false,
+  };
+
+  if (_priceChartType === 'candle') {
+    // Build OHLC candles from daily closes
+    const candles = aggregateToCandles(filtered, range);
+
+    _priceChartInstance = new Chart(ctx, {
+      type: 'candlestick',
+      data: {
+        datasets: [{
+          label: ticker,
+          data: candles,
+          color: { up: '#00e676', down: '#ff4444', unchanged: '#888888' },
+          borderColor: { up: '#00c060', down: '#cc3333', unchanged: '#666666' },
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...sharedTooltip,
+            callbacks: {
+              title: (items) => {
+                if (!items.length) return '';
+                return new Date(items[0].parsed.x).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              },
+              label: (item) => {
+                const raw = item.raw;
+                return [
+                  'O: KES ' + raw.o.toFixed(2),
+                  'H: KES ' + raw.h.toFixed(2),
+                  'L: KES ' + raw.l.toFixed(2),
+                  'C: KES ' + raw.c.toFixed(2),
+                ];
+              }
+            }
+          }
+        },
+        scales: sharedScales,
+      }
+    });
+
+  } else {
+    // Line chart (default)
+    const chartData = filtered.map(p => ({ x: p[0], y: p[1] }));
+
+    const gradient = ctx.getContext('2d');
+    const gradientFill = gradient.createLinearGradient(0, 0, 0, 320);
+    if (isUp) {
+      gradientFill.addColorStop(0, 'rgba(0, 230, 118, 0.2)');
+      gradientFill.addColorStop(1, 'rgba(0, 230, 118, 0.0)');
+    } else {
+      gradientFill.addColorStop(0, 'rgba(255, 68, 68, 0.2)');
+      gradientFill.addColorStop(1, 'rgba(255, 68, 68, 0.0)');
+    }
+
+    _priceChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          data: chartData,
+          borderColor: isUp ? '#00e676' : '#ff4444',
+          borderWidth: 2,
+          fill: true,
+          backgroundColor: gradientFill,
+          pointRadius: 0,
+          pointHitRadius: 8,
+          tension: 0.1,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...sharedTooltip,
+            callbacks: {
+              title: (items) => {
+                if (!items.length) return '';
+                return new Date(items[0].parsed.x).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              },
+              label: (item) => 'KES ' + item.parsed.y.toFixed(2),
+            }
+          }
+        },
+        scales: sharedScales,
       }
     });
   }
@@ -931,18 +950,17 @@ async function fetchNews(ticker, companyName) {
   }
 }
 
-// ---- Load Company ----
-function loadCompany() {
-  const sel = document.getElementById('company-select').value;
-  if (!sel || !NSE_COMPANIES[sel]) return;
-  const co = NSE_COMPANIES[sel];
+// ---- Load Company (shared core) ----
+function loadCompanyByTicker(ticker) {
+  if (!ticker || !NSE_COMPANIES[ticker]) return;
+  const co = NSE_COMPANIES[ticker];
   activeCompany = co;
   _currentCompany = co;
   _currentPeriod = 'annual';
 
   document.getElementById('dashboard').classList.remove('hidden');
   document.getElementById('empty-state').classList.add('hidden');
-  document.getElementById('market-summary').classList.add('hidden'); // Hide market summary when company is selected
+  document.getElementById('market-summary').classList.add('hidden');
   const infoRow = document.getElementById('info-row');
   if (infoRow) infoRow.classList.remove('hidden');
   document.getElementById('sector-overview').classList.add('hidden');
@@ -968,12 +986,10 @@ function loadCompany() {
 
   // Always render price chart
   _currentRange = '1Y';
-  renderPriceChart(sel, '1Y');
+  renderPriceChart(ticker, '1Y');
 
   // Check if stock has financial data
   const hasFinancials = co.annuals && co.annuals.length > 0;
-
-  // Toggle financial sections visibility
   const financialSections = ['stats-grid', 'sector-charts-container', 'valuation-panel'];
   const chartControls = document.querySelector('.chart-controls');
 
@@ -997,7 +1013,6 @@ function loadCompany() {
     renderCharts(co, 'annual', template);
     renderValuation(co);
   } else {
-    // Price-only stock — hide financial sections
     if (chartControls) chartControls.style.display = 'none';
     financialSections.forEach(id => {
       const el = document.getElementById(id);
@@ -1006,6 +1021,13 @@ function loadCompany() {
     document.getElementById('company-eps-pill').textContent = 'Price only — no financial data yet';
     document.getElementById('company-latest-year').textContent = co.sector;
   }
+}
+
+// Legacy entry point (kept for any remaining callers)
+function loadCompany() {
+  const sel = document.getElementById('company-select');
+  const ticker = sel ? sel.value : (document.getElementById('company-search-input') || {}).value;
+  loadCompanyByTicker((ticker || '').trim().toUpperCase());
 }
 
 // ---- Stats Grid ----
@@ -1058,7 +1080,10 @@ function renderStatsGrid(co, template) {
       // Format specific ratio types
       if (key.includes('roe') || key.includes('roa') || key.includes('margin') || key.includes('growth')) {
         // These are percentages
-        return { text: (typeof v === 'number' ? v : v) + '%', cls: '' };
+        const numVal = typeof v === 'number' ? v : parseFloat(v);
+        if (isNaN(numVal)) return { text: '\u2014', cls: '' };
+        const cls = numVal >= 0 ? 'positive' : 'negative';
+        return { text: (numVal >= 0 ? '+' : '') + numVal.toFixed(1) + '%', cls };
       }
       if (key.includes('debtequity') || key.includes('assetturnover') || key.includes('currentratio')) {
         // These are pure ratios
@@ -1092,11 +1117,51 @@ function renderStatsGrid(co, template) {
     return { title: sec.title, rows };
   });
 
-  document.getElementById('stats-grid').innerHTML = sections.map(sec =>
-    '<div class="stat-section"><div class="stat-section-title">' + sec.title + '</div>' +
-    sec.rows.map(r => '<div class="stat-row"><span class="stat-label">' + r.label + '</span><span class="stat-val ' + (r.cls || '') + '">' + r.val + '</span></div>').join('') +
-    '</div>'
-  ).join('');
+  // Group sections into pairs for carousel
+  const slides = [];
+  for (let i = 0; i < sections.length; i += 2) {
+    slides.push(sections.slice(i, i + 2));
+  }
+
+  function buildSection(sec) {
+    return '<div class="stat-section"><div class="stat-section-title">' + sec.title + '</div>' +
+      sec.rows.map(r => '<div class="stat-row"><span class="stat-label">' + r.label + '</span><span class="stat-val ' + (r.cls || '') + '">' + r.val + '</span></div>').join('') +
+      '</div>';
+  }
+
+  const totalSlides = slides.length;
+  document.getElementById('stats-grid').innerHTML =
+    '<div class="stats-carousel-wrap">' +
+      '<button class="stats-nav stats-nav-prev" onclick="statsCarouselNav(-1)" aria-label="Previous">&#8249;</button>' +
+      '<div class="stats-carousel" id="stats-carousel">' +
+        slides.map((pair, idx) =>
+          '<div class="stats-slide" data-slide="' + idx + '">' +
+            pair.map(buildSection).join('') +
+          '</div>'
+        ).join('') +
+      '</div>' +
+      '<button class="stats-nav stats-nav-next" onclick="statsCarouselNav(1)" aria-label="Next">&#8250;</button>' +
+    '</div>' +
+    '<div class="stats-dots">' +
+      slides.map((_, i) => '<span class="stats-dot' + (i === 0 ? ' active' : '') + '" onclick="statsCarouselGoTo(' + i + ')"></span>').join('') +
+    '</div>';
+}
+
+let _statsSlide = 0;
+function statsCarouselNav(dir) {
+  const carousel = document.getElementById('stats-carousel');
+  if (!carousel) return;
+  const total = carousel.querySelectorAll('.stats-slide').length;
+  _statsSlide = (_statsSlide + dir + total) % total;
+  statsCarouselGoTo(_statsSlide);
+}
+function statsCarouselGoTo(idx) {
+  const carousel = document.getElementById('stats-carousel');
+  if (!carousel) return;
+  _statsSlide = idx;
+  const slide = carousel.querySelectorAll('.stats-slide')[idx];
+  if (slide) slide.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+  document.querySelectorAll('.stats-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
 }
 
 // ---- Render Charts ----
@@ -1155,14 +1220,14 @@ function openChartModal(chartTitle, chartConfig, metadata) {
   metaEl.textContent = metadata || '';
 
   // Destroy old instance if exists
-  if (_modalChartInstance) _modalChartInstance.destroy();
+  if (_modalChartInstance) { _modalChartInstance.destroy(); _modalChartInstance = null; }
 
-  // Create new chart in modal
+  // Show modal FIRST so canvas has proper dimensions for chart rendering
+  modal.classList.remove('hidden');
+
+  // Render chart — use config directly (it's the original _config with all functions intact)
   const ctx = canvas.getContext('2d');
   _modalChartInstance = new Chart(ctx, chartConfig);
-
-  // Show modal
-  modal.classList.remove('hidden');
 }
 
 function closeChartModal() {
@@ -1215,17 +1280,130 @@ function initChartModalHandlers() {
     const titleEl = card.querySelector('.chart-title');
     const chartTitle = titleEl ? titleEl.textContent.trim() : 'Chart';
 
-    // Clone chart config
-    const config = { ...canvasInstance.config };
+    // Use the actual internal config (_config is the original object passed to new Chart())
+    const config = canvasInstance.config._config || canvasInstance.config;
     const metadata = 'Company: ' + (_currentCompany?.ticker || '—') + ' | Period: ' + _currentPeriod;
 
     openChartModal(chartTitle, config, metadata);
   });
 }
 
+// ---- Company Search Autocomplete ----
+let selectedSuggestionIndex = -1;
+
+function filterCompanies(query) {
+  const entries = Object.entries(NSE_COMPANIES);
+  if (!query || query.length === 0) {
+    // Return all companies grouped by sector when browsing
+    return entries
+      .sort((a, b) => (a[1].sector || '').localeCompare(b[1].sector || '') || a[0].localeCompare(b[0]))
+      .map(([ticker, co]) => ({
+        ticker,
+        name: co.name,
+        sector: co.sector,
+        price: co.latestPrice,
+        priceChange: co.priceChange,
+        priceChangePct: co.priceChangePct
+      }));
+  }
+  const q = query.toLowerCase();
+  return entries
+    .filter(([ticker, co]) => {
+      const tickerMatch = ticker.toLowerCase().includes(q);
+      const nameMatch = (co.name || '').toLowerCase().includes(q);
+      return tickerMatch || nameMatch;
+    })
+    .slice(0, 12)
+    .map(([ticker, co]) => ({
+      ticker,
+      name: co.name,
+      sector: co.sector,
+      price: co.latestPrice,
+      priceChange: co.priceChange,
+      priceChangePct: co.priceChangePct
+    }));
+}
+
+function displaySuggestions(suggestions, grouped) {
+  const dropdown = document.getElementById('company-suggestions');
+
+  if (suggestions.length === 0) {
+    dropdown.classList.remove('active');
+    return;
+  }
+
+  if (grouped) {
+    // Group by sector for browse mode
+    const sectors = {};
+    for (const s of suggestions) {
+      const sec = s.sector || 'Other';
+      if (!sectors[sec]) sectors[sec] = [];
+      sectors[sec].push(s);
+    }
+    let html = '';
+    for (const [sec, items] of Object.entries(sectors)) {
+      html += `<div class="suggestion-group-header">${sec}</div>`;
+      html += items.map(s => buildSuggestionItem(s)).join('');
+    }
+    dropdown.innerHTML = html;
+  } else {
+    dropdown.innerHTML = suggestions.map(s => buildSuggestionItem(s)).join('');
+  }
+
+  dropdown.classList.add('active');
+  selectedSuggestionIndex = -1;
+}
+
+function buildSuggestionItem(s) {
+  const priceStr = s.price ? fmtPrice(s.price) : '—';
+  let changeHtml = '';
+  if (s.priceChangePct !== undefined && s.priceChangePct !== null) {
+    const cls = s.priceChangePct >= 0 ? 'up' : 'down';
+    const sign = s.priceChangePct >= 0 ? '+' : '';
+    changeHtml = `<span class="company-suggestion-change ${cls}">${sign}${s.priceChangePct.toFixed(1)}%</span>`;
+  }
+  return `<div class="company-suggestion-item" onclick="selectSuggestion('${s.ticker}')">
+    <span class="company-suggestion-ticker">${s.ticker}</span>
+    <span class="company-suggestion-name">${s.name}</span>
+    <span class="company-suggestion-price">${priceStr}</span>
+    ${changeHtml}
+  </div>`;
+}
+
+function toggleSearchDropdown() {
+  const dropdown = document.getElementById('company-suggestions');
+  if (dropdown.classList.contains('active')) {
+    dropdown.classList.remove('active');
+    return;
+  }
+  const all = filterCompanies('');
+  displaySuggestions(all, true);
+}
+
+function selectSuggestion(ticker) {
+  const input = document.getElementById('company-search-input');
+  const company = NSE_COMPANIES[ticker];
+  if (company) {
+    input.value = company.ticker;
+    document.getElementById('company-suggestions').classList.remove('active');
+    loadCompanyFromSearch();
+  }
+}
+
+function loadCompanyFromSearch() {
+  const input = document.getElementById('company-search-input');
+  if (!input) return;
+  const ticker = input.value.trim().toUpperCase();
+  document.getElementById('company-suggestions').classList.remove('active');
+  loadCompanyByTicker(ticker);
+}
+
 // ---- Populate dropdown with all stocks ----
 function populateDropdown() {
+  // Note: This function now serves for initialization of all companies
+  // The autocomplete search handles the actual filtering
   const sel = document.getElementById('company-select');
+  if (!sel) return; // Exit early if using autocomplete instead of select
   const sectors = {};
 
   for (const [ticker, co] of Object.entries(NSE_COMPANIES)) {
@@ -1349,9 +1527,9 @@ function calculateSectorAggregates(sectorName) {
     }
   });
 
-  const avgPE = peValues.length > 0 ? (peValues.reduce((a, b) => a + b, 0) / peValues.length) : null;
-  const avgROE = roeValues.length > 0 ? (roeValues.reduce((a, b) => a + b, 0) / roeValues.length) : null;
-  const avgGrowth = priceChangeValues.length > 0 ? (priceChangeValues.reduce((a, b) => a + b, 0) / priceChangeValues.length) : null;
+  const avgPE = peValues.length > 0 ? (peValues.reduce((a, b) => a + b, 0) / peValues.length).toFixed(1) : null;
+  const avgROE = roeValues.length > 0 ? (roeValues.reduce((a, b) => a + b, 0) / roeValues.length).toFixed(1) : null;
+  const avgGrowth = priceChangeValues.length > 0 ? (priceChangeValues.reduce((a, b) => a + b, 0) / priceChangeValues.length).toFixed(1) : 0;
 
   // Sector strength indicator based on average price change
   let strength = 'mixed';
@@ -1362,7 +1540,7 @@ function calculateSectorAggregates(sectorName) {
     marketCap: totalMarketCap > 0 ? totalMarketCap : null,
     avgPE,
     avgROE,
-    avgGrowth,
+    avgGrowth: parseFloat(avgGrowth),
     strength,
     companyCount: companies.length,
   };
@@ -1556,6 +1734,13 @@ function renderValuation(co) {
   const summary = document.getElementById('valuation-summary');
   const assumptions = document.getElementById('valuation-assumptions');
 
+  // Coming soon
+  panel.classList.remove('hidden');
+  grid.innerHTML = '<div class="valuation-coming-soon"><span class="valuation-cs-icon">🔬</span><div class="valuation-cs-text">Coming soon</div><div class="valuation-cs-sub">Advanced valuation models are being refined</div></div>';
+  summary.innerHTML = '';
+  if (assumptions) assumptions.innerHTML = '';
+  return;
+
   const result = computeValuation(co);
   if (!result) {
     panel.classList.add('hidden');
@@ -1669,20 +1854,25 @@ function renderMarketSummary() {
     const sorted = [...withPrices].sort((a, b) => (b[1].priceChangePct || 0) - (a[1].priceChangePct || 0));
     const gainer = sorted[0];
     const loser = sorted[sorted.length - 1];
-    document.getElementById('ms-gainer').textContent = gainer[0] + ' +' + (gainer[1].priceChangePct || 0).toFixed(1) + '%';
-    document.getElementById('ms-loser').textContent = loser[0] + ' ' + (loser[1].priceChangePct || 0).toFixed(1) + '%';
+    const gainerEl = document.getElementById('ms-gainer');
+    const loserEl  = document.getElementById('ms-loser');
+    if (gainerEl) gainerEl.textContent = gainer[0] + ' +' + (gainer[1].priceChangePct || 0).toFixed(1) + '%';
+    if (loserEl)  loserEl.textContent  = loser[0]  + ' '  + (loser[1].priceChangePct  || 0).toFixed(1) + '%';
   }
 
   // Override with market.json data if available
   if (NSE_MARKET) {
     if (NSE_MARKET.topGainer) {
-      document.getElementById('ms-gainer').textContent = NSE_MARKET.topGainer.ticker + ' +' + NSE_MARKET.topGainer.change_pct.toFixed(1) + '%';
+      const gEl = document.getElementById('ms-gainer');
+      if (gEl) gEl.textContent = NSE_MARKET.topGainer.ticker + ' +' + NSE_MARKET.topGainer.change_pct.toFixed(1) + '%';
     }
     if (NSE_MARKET.topLoser) {
-      document.getElementById('ms-loser').textContent = NSE_MARKET.topLoser.ticker + ' ' + NSE_MARKET.topLoser.change_pct.toFixed(1) + '%';
+      const lEl = document.getElementById('ms-loser');
+      if (lEl) lEl.textContent = NSE_MARKET.topLoser.ticker + ' ' + NSE_MARKET.topLoser.change_pct.toFixed(1) + '%';
     }
     if (NSE_MARKET.stocksTracked) {
-      document.getElementById('ms-stocks').textContent = NSE_MARKET.stocksTracked;
+      const sEl = document.getElementById('ms-stocks');
+      if (sEl) sEl.textContent = NSE_MARKET.stocksTracked;
     }
   }
 
@@ -1695,7 +1885,8 @@ function renderMarketSummary() {
     }).filter(v => v !== null);
     if (pes.length > 0) {
       const avgPE = pes.reduce((s, v) => s + v, 0) / pes.length;
-      document.getElementById('ms-pe').textContent = avgPE.toFixed(1) + 'x';
+      const peEl = document.getElementById('ms-pe');
+      if (peEl) peEl.textContent = avgPE.toFixed(1) + 'x';
     }
   }
 
@@ -1705,7 +1896,8 @@ function renderMarketSummary() {
     const yields = withDiv.map(([, c]) => (c.annuals[0].dps / c.latestPrice) * 100).filter(y => y <= 25);
     if (yields.length > 0) {
       const avgYield = yields.reduce((s, v) => s + v, 0) / yields.length;
-      document.getElementById('ms-divyield').textContent = avgYield.toFixed(1) + '%';
+      const dyEl = document.getElementById('ms-divyield');
+      if (dyEl) dyEl.textContent = avgYield.toFixed(1) + '%';
     }
   }
 
@@ -1789,12 +1981,6 @@ function renderSectorOverview() {
   grid.style.display = '';
   tableWrap.classList.add('hidden');
 
-  // Check if data is loaded
-  if (!NSE_COMPANIES || Object.keys(NSE_COMPANIES).length === 0) {
-    grid.innerHTML = '<div style="grid-column: 1/-1; padding: 3rem; text-align: center; color: var(--text-muted);">Loading sectors...</div>';
-    return;
-  }
-
   // Group companies by normalized sector
   const sectors = {};
   for (const [ticker, co] of Object.entries(NSE_COMPANIES)) {
@@ -1825,7 +2011,7 @@ function renderSectorOverview() {
     let statsHtml = '<div class="sector-card-stats">';
     if (agg.avgPE) statsHtml += '<span class="stat-badge">P/E: ' + agg.avgPE + 'x</span>';
     if (agg.avgROE) statsHtml += '<span class="stat-badge">ROE: ' + agg.avgROE + '%</span>';
-    statsHtml += '<span class="stat-badge strength-' + agg.strength + '">' + strengthEmoji + ' ' + (agg.avgGrowth != null ? (agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) : '0') + '%</span>';
+    statsHtml += '<span class="stat-badge strength-' + agg.strength + '">' + strengthEmoji + ' ' + (agg.avgGrowth != null ? ((agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) + '%') : '—') + '</span>';
     statsHtml += '</div>';
 
     return '<div class="sector-card" onclick="renderSectorTable(\'' + sec.replace(/'/g, "\\'") + '\')">' +
@@ -1962,7 +2148,7 @@ function renderSectorSnapshot(sectorName) {
     cards.push({ label: 'Avg ROE', value: agg.avgROE + '%' });
   }
   if (agg.avgGrowth !== null) {
-    cards.push({ label: 'Avg Growth', value: (agg.avgGrowth != null ? (agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) : '0') + '%' });
+    cards.push({ label: 'Avg Growth', value: (agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) + '%' });
   }
 
   snapshotGrid.innerHTML = cards.map(card => {
@@ -2056,9 +2242,10 @@ function renderSectorComparison(sectorName) {
 }
 
 function selectFromSector(ticker) {
-  document.getElementById('company-select').value = ticker;
+  const searchInput = document.getElementById('company-search-input');
+  if (searchInput) searchInput.value = ticker;
   showView('companies');
-  loadCompany();
+  loadCompanyByTicker(ticker);
 }
 
 // ---- Mobile Navigation ----
@@ -2157,11 +2344,8 @@ function toggleTheme() {
     });
     // Re-render only the charts, not the full company load
     renderPriceChart(ticker, _currentRange || '1Y');
-    if (_currentPeriod === 'annual') {
-      renderCompanyCharts(activeCompany, 'annual');
-    } else {
-      renderCompanyCharts(activeCompany, 'quarterly');
-    }
+    const template = getTemplate(activeCompany.sector);
+    renderCharts(activeCompany, _currentPeriod || 'annual', template);
   }
 }
 
@@ -2180,19 +2364,39 @@ function initTheme() {
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
-  initTierUI();
   await loadPrices();
   await loadMarketData();
   populateDropdown();
   renderMarketSummary();
   initChartModalHandlers();
 
-  document.getElementById('company-select').addEventListener('keydown', e => {
-    if (e.key === 'Enter') loadCompany();
-  });
-  document.getElementById('company-select').addEventListener('change', () => {
-    loadCompany();
-  });
+  // Setup autocomplete search
+  const searchInput = document.getElementById('company-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value;
+      if (query.length > 0) {
+        const suggestions = filterCompanies(query);
+        displaySuggestions(suggestions, false);
+      } else {
+        document.getElementById('company-suggestions').classList.remove('active');
+      }
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        loadCompanyFromSearch();
+      }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.company-search-container')) {
+        document.getElementById('company-suggestions').classList.remove('active');
+      }
+    });
+  }
 
   // Price chart range buttons
   document.getElementById('price-range-btns').addEventListener('click', (e) => {
