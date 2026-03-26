@@ -523,6 +523,9 @@
     // shows a file picker, and loads the selected file.
     let _docFiles = []; // current company's document list
 
+    const R2_BASE = 'https://pub-392c9faa02aa450cb27f645c16e32feb.r2.dev';
+    const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
     function loadPDF(ticker) {
       const company = NSE_COMPANIES[ticker];
       if (!company) { showNoPDFMessage(); return; }
@@ -530,44 +533,43 @@
       const container = document.getElementById('pdf-container');
       container.innerHTML = `<div class="pdf-empty"><div class="pdf-empty-icon">⏳</div><div class="pdf-empty-text"><p>Scanning documents folder…</p></div></div>`;
 
-      const dirUrl = `data/companies/${ticker}/documents/`;
-
-      fetch(dirUrl)
-        .then(res => res.text())
-        .then(html => {
-          // Parse directory listing HTML — extract .pdf hrefs
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-          const links = Array.from(doc.querySelectorAll('a[href$=".pdf"]'));
-          const files = links
-            .map(a => decodeURIComponent(a.getAttribute('href')))
-            .filter(f => f && !f.startsWith('/') && f.endsWith('.pdf'))
-            .sort((a, b) => b.localeCompare(a)); // newest first (reverse alpha ≈ newest year)
-
-          if (files.length === 0) {
-            // Fall back to legacy company.pdf path
-            if (company.pdf) {
-              openPDF(company.pdf, company.name, '—', company);
-            } else {
-              showNoPDFMessage();
-            }
-            return;
-          }
-
-          _docFiles = files;
-          // Auto-load the first (most recent) file
-          openPDF(dirUrl + files[0], files[0], extractYear(files[0]), company);
-          // Show file picker in breadcrumb area
-          renderFilePicker(files, dirUrl, company);
-        })
-        .catch(() => {
-          // Directory listing not available — fall back to named candidates
-          if (company.pdf) {
-            openPDF(company.pdf, company.name, '—', company);
-          } else {
-            showNoPDFMessage();
-          }
-        });
+      if (IS_LOCAL) {
+        // localhost: use Python HTTP server directory listing
+        const dirUrl = `data/companies/${ticker}/documents/`;
+        fetch(dirUrl)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const links = Array.from(doc.querySelectorAll('a[href$=".pdf"]'));
+            const files = links
+              .map(a => decodeURIComponent(a.getAttribute('href')))
+              .filter(f => f && !f.startsWith('/') && f.endsWith('.pdf'))
+              .sort((a, b) => b.localeCompare(a));
+            if (files.length === 0) { showNoPDFMessage(); return; }
+            _docFiles = files;
+            openPDF(dirUrl + files[0], files[0], extractYear(files[0]), company);
+            renderFilePicker(files, dirUrl, company);
+          })
+          .catch(() => showNoPDFMessage());
+      } else {
+        // Production: fetch manifest.json from R2
+        const manifestUrl = `${R2_BASE}/companies/${ticker}/manifest.json`;
+        const dirUrl = `${R2_BASE}/companies/${ticker}/documents/`;
+        fetch(manifestUrl)
+          .then(res => {
+            if (!res.ok) throw new Error('no manifest');
+            return res.json();
+          })
+          .then(files => {
+            if (!files || files.length === 0) { showNoPDFMessage(); return; }
+            const sorted = [...files].sort((a, b) => b.localeCompare(a));
+            _docFiles = sorted;
+            openPDF(dirUrl + sorted[0], sorted[0], extractYear(sorted[0]), company);
+            renderFilePicker(sorted, dirUrl, company);
+          })
+          .catch(() => showNoPDFMessage());
+      }
     }
 
     function extractYear(filename) {
