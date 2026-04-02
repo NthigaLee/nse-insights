@@ -1996,11 +1996,98 @@ function normalizeSector(sec) {
   return d ? d.label : (sec || 'Other');
 }
 
+function getCompanyMarketCap(co) {
+  // Derive shares outstanding from PAT / EPS, then multiply by current price
+  const price = co.latestPrice;
+  if (!price || price <= 0) return null;
+  const latest = co.annuals && co.annuals[0];
+  if (!latest || !latest.eps || latest.eps <= 0 || !latest.pat || latest.pat <= 0) return null;
+  const shares = (latest.pat * 1000) / latest.eps; // pat in KES '000, eps in KES/share
+  return price * shares; // market cap in KES
+}
+
+function renderSectorHeatmap() {
+  const el = document.getElementById('sector-heatmap');
+  if (!el) return;
+
+  const SECTOR_ORDER = ['Banking', 'Telecoms & Technology', 'Consumer Goods', 'Insurance', 'Energy & Utilities', 'Agriculture', 'Manufacturing', 'Media & Services', 'Diversified'];
+
+  // Build sector data
+  const sectorData = SECTOR_ORDER.map(sec => {
+    const cos = Object.values(NSE_COMPANIES).filter(co => normalizeSector(co.sector) === sec);
+    let totalMcap = 0, priceChanges = [], companyCount = cos.length;
+    cos.forEach(co => {
+      const mc = getCompanyMarketCap(co);
+      if (mc) totalMcap += mc;
+      if (co.priceChangePct != null) priceChanges.push(co.priceChangePct);
+    });
+    const avgChange = priceChanges.length ? priceChanges.reduce((a, b) => a + b, 0) / priceChanges.length : 0;
+    const display = SECTOR_DISPLAY[sec] || { emoji: '📈', label: sec };
+    return { sec, label: display.label, emoji: display.emoji, totalMcap, avgChange, companyCount };
+  }).filter(d => d.totalMcap > 0);
+
+  const totalMcap = sectorData.reduce((s, d) => s + d.totalMcap, 0);
+  sectorData.sort((a, b) => b.totalMcap - a.totalMcap);
+
+  // Colour scale: dark red → neutral → dark green mapped to -10% → 0 → +10%
+  function heatColour(pct) {
+    const t = Math.max(-1, Math.min(1, pct / 10));
+    if (t >= 0) {
+      const g = Math.round(120 + 80 * t);
+      const rb = Math.round(30 - 20 * t);
+      return `rgb(${rb},${g},${rb})`;
+    } else {
+      const r = Math.round(150 + 80 * (-t));
+      const gb = Math.round(30 - 20 * (-t));
+      return `rgb(${r},${gb},${gb})`;
+    }
+  }
+
+  function fmtMcap(v) {
+    if (v >= 1e12) return (v / 1e12).toFixed(2) + 'T';
+    if (v >= 1e9) return (v / 1e9).toFixed(0) + 'B';
+    return (v / 1e6).toFixed(0) + 'M';
+  }
+
+  // Split into two rows: row1 gets sectors until ~60% of total, row2 gets rest
+  let cumulative = 0, row1 = [], row2 = [];
+  for (const d of sectorData) {
+    if (cumulative / totalMcap < 0.60) {
+      row1.push(d);
+      cumulative += d.totalMcap;
+    } else {
+      row2.push(d);
+    }
+  }
+  if (row1.length === 0) { row1 = sectorData.slice(0, 2); row2 = sectorData.slice(2); }
+
+  function renderRow(items) {
+    const rowTotal = items.reduce((s, d) => s + d.totalMcap, 0);
+    return items.map(d => {
+      const widthPct = (d.totalMcap / rowTotal * 100).toFixed(2);
+      const bg = heatColour(d.avgChange);
+      const changeStr = (d.avgChange >= 0 ? '+' : '') + d.avgChange.toFixed(1) + '%';
+      return `<div class="heatmap-tile" style="width:${widthPct}%;background:${bg}" onclick="renderSectorTable('${d.sec.replace(/'/g,"\\'")}')">
+        <div class="heatmap-tile-inner">
+          <div class="heatmap-sector-name">${d.label}</div>
+          <div class="heatmap-mcap">KES ${fmtMcap(d.totalMcap)}</div>
+          <div class="heatmap-change">${changeStr}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  el.innerHTML =
+    `<div class="heatmap-row">${renderRow(row1)}</div>` +
+    (row2.length ? `<div class="heatmap-row">${renderRow(row2)}</div>` : '');
+}
+
 function renderSectorOverview() {
   const grid = document.getElementById('sector-grid');
   const tableWrap = document.getElementById('sector-table-wrap');
   grid.style.display = '';
   tableWrap.classList.add('hidden');
+  renderSectorHeatmap();
 
   // Group companies by normalized sector
   const sectors = {};

@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#050505" />
   <meta name="description" content="NSE Insights - Kenya stock market financial data and analysis dashboard" />
   <title>NSE Insights — Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=8" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.min.js"></script>
@@ -238,6 +238,10 @@
 
   <!-- Sector Overview -->
   <div id="sector-overview" class="hidden">
+    <div class="sector-heatmap-wrap">
+      <div class="sector-heatmap-title">Market Cap Heatmap <span class="sector-heatmap-sub">Size = market cap &nbsp;·&nbsp; Colour = price change</span></div>
+      <div id="sector-heatmap"></div>
+    </div>
     <div class="sector-grid" id="sector-grid"></div>
     <div id="sector-table-wrap" class="hidden">
       <div class="sector-table-header">
@@ -322,6 +326,6 @@
   </footer>
 
   <script src="data.js?v=9"></script>
-  <script src="app.js?v=29"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>
