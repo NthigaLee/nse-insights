@@ -189,7 +189,7 @@ const NSE_COMPANIES = {
     "name": "Bamburi Cement",
     "ticker": "BAMB",
     "exchange": "NSE",
-    "sector": "Construction",
+    "sector": "Manufacturing",
     "logo": "🏗️",
     "description": "Bamburi Cement was East Africa's largest cement manufacturer and part of the global Holcim Group until 2024, when Holcim divested its majority stake through a competitive process, with operations in Kenya and Uganda producing Portland cement and construction solutions.",
     "staticNews": [
@@ -248,7 +248,7 @@ const NSE_COMPANIES = {
     "name": "BAT Kenya",
     "ticker": "BATK",
     "exchange": "NSE",
-    "sector": "FMCG",
+    "sector": "Consumer Goods",
     "logo": "🚬",
     "description": "British American Tobacco Kenya manufactures and markets tobacco products including Dunhill, Embassy, Sportsman, and Pall Mall cigarettes under licence, holding a dominant share of Kenya's formally regulated tobacco market.",
     "staticNews": [
@@ -599,7 +599,7 @@ const NSE_COMPANIES = {
     "name": "Carbacid",
     "ticker": "CARB",
     "exchange": "NSE",
-    "sector": "Manufacturing",
+    "sector": "Consumer Goods",
     "logo": "🏭",
     "description": "Carbacid Investments is Kenya's sole producer of food-grade and industrial carbon dioxide gas, supplying carbonated beverage manufacturers, food processors, fire suppression systems, and metal fabrication industries from its plant in Kereita, Kiambu.",
     "staticNews": [
@@ -1420,7 +1420,7 @@ const NSE_COMPANIES = {
     "name": "East African Breweries",
     "ticker": "EABL",
     "exchange": "NSE",
-    "sector": "FMCG",
+    "sector": "Consumer Goods",
     "logo": "🍺",
     "description": "East African Breweries Limited (EABL), a subsidiary of global spirits giant Diageo PLC, is East Africa's leading beverages company producing iconic brands including Tusker, White Cap, Senator Keg, Kenya Cane, and distributing Johnnie Walker and other international spirits.",
     "staticNews": [
@@ -1569,7 +1569,7 @@ const NSE_COMPANIES = {
     "name": "East African Portland Cement Plc",
     "ticker": "EAPC",
     "exchange": "NSE",
-    "sector": "Construction",
+    "sector": "Manufacturing",
     "logo": "📊",
     "description": "East African Portland Cement Company is a Kenyan cement manufacturer majority-owned by the Government of Kenya and National Social Security Fund, producing Portland and masonry cement for the domestic construction industry from its Athi River plant.",
     "staticNews": [
@@ -2068,7 +2068,7 @@ const NSE_COMPANIES = {
     "name": "Home Afrika",
     "ticker": "HAFR",
     "exchange": "NSE",
-    "sector": "Real Estate",
+    "sector": "Diversified",
     "logo": "🏠",
     "description": "Home Afrika is a Kenyan real estate developer focused on affordable and mid-market residential housing, with its flagship Migaa Golf Estate integrated community development in Kiambu County being its primary ongoing project.",
     "staticNews": [
@@ -2136,7 +2136,7 @@ const NSE_COMPANIES = {
     "name": "Homeboyz",
     "ticker": "HBZE",
     "exchange": "NSE",
-    "sector": "Entertainment",
+    "sector": "Telecoms & Technology",
     "logo": "🎬",
     "description": "Habib AG Zurich Bank Kenya is a niche commercial bank affiliated with the Swiss-based Habib AG Zurich group, specialising in trade finance, foreign exchange, and personal banking services primarily serving the Asian business community and international traders.",
     "staticNews": [
@@ -3162,7 +3162,7 @@ const NSE_COMPANIES = {
     "name": "KenGen",
     "ticker": "KEGN",
     "exchange": "NSE",
-    "sector": "Energy",
+    "sector": "Energy & Utilities",
     "logo": "⚡",
     "description": "KenGen (Kenya Electricity Generating Company) is Kenya's dominant power producer generating approximately 75% of the country's installed electricity capacity, primarily from geothermal and hydroelectric sources at its Olkaria fields and Tana River cascades.",
     "staticNews": [
@@ -3228,7 +3228,7 @@ const NSE_COMPANIES = {
     "name": "Kenya Power",
     "ticker": "KPLC",
     "exchange": "NSE",
-    "sector": "Energy",
+    "sector": "Energy & Utilities",
     "logo": "⚡",
     "description": "Kenya Power & Lighting Company (KPLC) is the sole electricity transmission and distribution company in Kenya, operating the national grid under a government-regulated utility framework and serving over 9 million electricity customers nationwide.",
     "staticNews": [
@@ -3613,7 +3613,7 @@ const NSE_COMPANIES = {
     "name": "Nation Media Group",
     "ticker": "NMG",
     "exchange": "NSE",
-    "sector": "Media",
+    "sector": "Media & Services",
     "logo": "📰",
     "description": "Nation Media Group is East and Central Africa's largest independent media company, publishing the Daily Nation, Business Daily, and Sunday Nation, and operating NTV television and Nation FM radio stations across Kenya, Uganda, Tanzania, and Rwanda.",
     "staticNews": [
@@ -3754,7 +3754,7 @@ const NSE_COMPANIES = {
     "name": "Nairobi Securities Exchange",
     "ticker": "NSE",
     "exchange": "NSE",
-    "sector": "Financial Services",
+    "sector": "Insurance",
     "logo": "📊",
     "description": "The Nairobi Securities Exchange is Kenya's principal securities exchange facilitating trading in equities, bonds, exchange-traded funds, and derivatives, and is itself publicly listed on its own bourse, making it one of Africa's few self-listed exchanges.",
     "staticNews": [
@@ -3928,7 +3928,7 @@ const NSE_COMPANIES = {
     "name": "WPP Scangroup",
     "ticker": "SCAN",
     "exchange": "NSE",
-    "sector": "Media",
+    "sector": "Media & Services",
     "logo": "📺",
     "description": "WPP Scangroup (Scangroup) is Sub-Saharan Africa's largest marketing and communications company, affiliated with global advertising giant WPP PLC, operating advertising, public relations, digital marketing, and media buying agencies across more than 20 African markets.",
     "staticNews": [
@@ -4225,7 +4225,7 @@ const NSE_COMPANIES = {
     "name": "Safaricom PLC",
     "ticker": "SCOM",
     "exchange": "NSE",
-    "sector": "Telecoms",
+    "sector": "Telecoms & Technology",
     "logo": "📱",
     "currency": "KES",
     "units": "thousands",
@@ -4407,7 +4407,7 @@ const NSE_COMPANIES = {
     "name": "The Standard Group PLC",
     "ticker": "SGL",
     "exchange": "NSE",
-    "sector": "Media",
+    "sector": "Media & Services",
     "logo": "📊",
     "description": "Stanlib Fahari I-REIT is Kenya's first listed income Real Estate Investment Trust, established in 2015 and managed by Stanlib Kenya, owning a portfolio of commercial office and retail properties in Nairobi that generate rental income distributions for unit holders.",
     "staticNews": [
@@ -4596,7 +4596,7 @@ const NSE_COMPANIES = {
     "name": "TransCentury",
     "ticker": "TCL",
     "exchange": "NSE",
-    "sector": "Infrastructure",
+    "sector": "Manufacturing",
     "logo": "🏗️",
     "description": "Trans-Century is a Kenyan infrastructure and engineering conglomerate with investments spanning power cables and conductors, electrical transformers, railway systems, and water infrastructure projects across East, Central, and Southern Africa.",
     "staticNews": [
@@ -4685,7 +4685,7 @@ const NSE_COMPANIES = {
     "name": "TPS Eastern Africa",
     "ticker": "TPSE",
     "exchange": "NSE",
-    "sector": "Hospitality",
+    "sector": "Media & Services",
     "logo": "🏨",
     "description": "TPS Eastern Africa (Serena Hotels) operates the prestigious Serena Hotels & Resorts chain across Kenya, Tanzania, Uganda, Rwanda, Mozambique, and Zanzibar, offering luxury and upscale hospitality to international business and leisure travellers.",
     "staticNews": [
@@ -4733,7 +4733,7 @@ const NSE_COMPANIES = {
     "name": "Umeme",
     "ticker": "UMME",
     "exchange": "NSE",
-    "sector": "Energy",
+    "sector": "Energy & Utilities",
     "logo": "⚡",
     "description": "Umeme Limited is Uganda's principal electricity distribution company, cross-listed on both the Uganda Securities Exchange and Nairobi Securities Exchange, having managed Uganda's national distribution network under a government concession that expired in February 2025.",
     "staticNews": [
@@ -4817,7 +4817,7 @@ const NSE_COMPANIES = {
     "name": "Unga Group Plc",
     "ticker": "UNGA",
     "exchange": "NSE",
-    "sector": "FMCG",
+    "sector": "Consumer Goods",
     "logo": "📊",
     "description": "Unga Group is Kenya's leading grain processing company, milling wheat flour, maize flour, and animal feeds under well-known brands including Unga Dola, Jogoo, Starehe, and Turbo Gold, serving retail consumers, industrial bakers, and livestock farmers.",
     "staticNews": [
@@ -4993,7 +4993,7 @@ const NSE_COMPANIES = {
     "name": "Express Kenya",
     "ticker": "XPRS",
     "exchange": "NSE",
-    "sector": "Logistics",
+    "sector": "Media & Services",
     "logo": "🚚",
     "description": "Express Kenya is a logistics and courier services company providing domestic and international parcel delivery, freight forwarding, customs clearance, and warehousing solutions, serving e-commerce platforms, retail businesses, and corporate clients across Kenya.",
     "staticNews": [

@@ -545,27 +545,61 @@ select optgroup { background: var(--bg-surface); color: #000; font-weight: 700; 
   margin: 1.5rem auto;
   padding: 0 1.5rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
 }
 .sector-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 1.2rem;
+  padding: 1.25rem;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 .sector-card:hover {
   border-color: var(--accent-primary);
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.1);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.12);
 }
-.sector-card-emoji { font-size: 1.8rem; margin-bottom: 0.5rem; }
-.sector-card-name { font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 0.25rem; }
-.sector-card-count { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.6rem; }
+.sector-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+.sector-card-emoji { font-size: 1.6rem; }
+.sector-card-trend {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+.sector-card-trend.pos { color: #10b981; background: rgba(16, 185, 129, 0.12); }
+.sector-card-trend.neg { color: #ef4444; background: rgba(239, 68, 68, 0.12); }
+.sector-card-trend.neu { color: var(--text-muted); background: var(--bg-hover); }
+.sector-card-name { font-weight: 700; font-size: 1rem; color: var(--text-primary); }
+.sector-card-count { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+.sector-card-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+.sector-metric-item {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-/* Sector Card Stats */
+/* Legacy Sector Card Stats */
 .sector-card-stats {
   display: flex;
   flex-wrap: wrap;
@@ -1538,8 +1572,8 @@ body.light .chart-type-btn:hover { background: rgba(0,0,0,0.06); }
   .chart-modal-fullscreen,
   .chart-modal-close { width: 36px; height: 36px; font-size: 1rem; }
 
-  /* Sector grid */
-  .sector-grid { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; padding: 0 0.75rem; }
+  /* Sector grid — keep 3 cols down to 900px */
+  .sector-grid { grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
 
   /* Valuation */
   .valuation-grid { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
@@ -1558,7 +1592,7 @@ body.light .chart-type-btn:hover { background: rgba(0,0,0,0.06); }
   .stats-grid { grid-template-columns: 1fr; }
 
   /* Sector grid */
-  .sector-grid { grid-template-columns: 1fr 1fr; }
+  .sector-grid { grid-template-columns: repeat(3, 1fr); }
 
   /* Valuation */
   .valuation-grid { grid-template-columns: 1fr; }
@@ -1882,7 +1916,7 @@ body.light .chart-type-btn:hover { background: rgba(0,0,0,0.06); }
     grid-template-columns: 1fr;
   }
   .sector-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -1995,11 +2029,14 @@ body.light .chart-type-btn:hover { background: rgba(0,0,0,0.06); }
 
   /* ── Sector Grid ─────────────────────────────── */
   .sector-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+    padding: 0 0.75rem;
   }
   .sector-card {
     padding: 1rem;
   }
+  .sector-card-metrics { grid-template-columns: 1fr; }
 
   /* ── Footer ──────────────────────────────────── */
   .site-footer {

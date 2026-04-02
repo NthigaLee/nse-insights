@@ -1479,70 +1479,79 @@ const KENYA_MARKET = {
 
 // ---- Sector Aggregation Functions ----
 function calculateSectorAggregates(sectorName) {
-  // Group all companies in sector and calculate aggregate metrics
-  const companies = Object.entries(NSE_COMPANIES)
+  const allCos = Object.entries(NSE_COMPANIES)
     .filter(([, co]) => normalizeSector(co.sector) === sectorName)
-    .map(([, co]) => co)
-    .filter(co => co.annuals && co.annuals.length > 0); // Only companies with financials
+    .map(([, co]) => co);
+  const companies = allCos.filter(co => co.annuals && co.annuals.length > 0);
 
   if (companies.length === 0) {
-    return {
-      marketCap: null,
-      avgPE: null,
-      avgROE: null,
-      avgGrowth: null,
-      strength: null,
-      companyCount: 0,
-    };
+    return { avgPE: null, avgROE: null, avgGrowth: 0, strength: 'mixed', companyCount: 0 };
   }
 
-  // Market Cap: sum of (price × shares outstanding)
-  // Note: using price as proxy; assumes ~1M shares for each company
-  // This is an approximation without actual shares outstanding data
-  let totalMarketCap = 0;
-  let peValues = [];
-  let roeValues = [];
-  let priceChangeValues = [];
+  const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+  const fmt1 = v => v != null ? parseFloat(v.toFixed(1)) : null;
+
+  let peVals = [], roeVals = [], growthVals = [], revenueVals = [], patMarginVals = [];
+  let niiVals = [], totalAssetsVals = [], divYieldVals = [], roaVals = [];
+  let revenueGrowthVals = [], patGrowthVals = [];
 
   companies.forEach(co => {
-    if (co.latestPrice && co.latestPrice > 0) {
-      // Approximate market cap (price × estimated shares; using price as proxy)
-      totalMarketCap += co.latestPrice * 1000; // Approximation
+    const latest = co.annuals[0];
+    const prev = co.annuals[1];
+    const price = co.latestPrice;
 
-      // P/E ratio
-      const latest = co.annuals[0];
-      if (latest && latest.eps && latest.eps > 0) {
-        const pe = co.latestPrice / latest.eps;
-        if (pe > 0 && pe < 100) peValues.push(pe); // Filter outliers
-      }
-
-      // ROE
-      const roe = calcROE(latest);
-      if (roe !== null) roeValues.push(parseFloat(roe));
-
-      // Price change %
-      if (co.priceChangePct !== undefined) {
-        priceChangeValues.push(co.priceChangePct);
-      }
+    // P/E
+    if (price > 0 && latest.eps > 0) {
+      const pe = price / latest.eps;
+      if (pe > 0 && pe < 100) peVals.push(pe);
+    }
+    // ROE
+    const roe = calcROE(latest);
+    if (roe !== null) roeVals.push(parseFloat(roe));
+    // ROA
+    const roa = calcROA(latest);
+    if (roa !== null) roaVals.push(parseFloat(roa));
+    // Price change
+    if (co.priceChangePct != null) growthVals.push(co.priceChangePct);
+    // Revenue
+    if (latest.revenue > 0) revenueVals.push(latest.revenue);
+    // PAT margin
+    if (latest.revenue > 0 && latest.pat > 0) patMarginVals.push((latest.pat / latest.revenue) * 100);
+    // NII (banking)
+    if (latest.nii > 0) niiVals.push(latest.nii);
+    // Total assets
+    if (latest.totalAssets > 0) totalAssetsVals.push(latest.totalAssets);
+    // Dividend yield
+    if (price > 0 && latest.dps > 0) divYieldVals.push((latest.dps / price) * 100);
+    // Revenue YoY growth
+    if (prev && prev.revenue > 0 && latest.revenue > 0) {
+      revenueGrowthVals.push(((latest.revenue - prev.revenue) / prev.revenue) * 100);
+    }
+    // PAT YoY growth
+    if (prev && prev.pat > 0 && latest.pat > 0) {
+      patGrowthVals.push(((latest.pat - prev.pat) / prev.pat) * 100);
     }
   });
 
-  const avgPE = peValues.length > 0 ? (peValues.reduce((a, b) => a + b, 0) / peValues.length).toFixed(1) : null;
-  const avgROE = roeValues.length > 0 ? (roeValues.reduce((a, b) => a + b, 0) / roeValues.length).toFixed(1) : null;
-  const avgGrowth = priceChangeValues.length > 0 ? (priceChangeValues.reduce((a, b) => a + b, 0) / priceChangeValues.length).toFixed(1) : 0;
-
-  // Sector strength indicator based on average price change
+  const avgGrowth = fmt1(avg(growthVals)) || 0;
   let strength = 'mixed';
   if (avgGrowth > 5) strength = 'up';
   else if (avgGrowth < -5) strength = 'down';
 
   return {
-    marketCap: totalMarketCap > 0 ? totalMarketCap : null,
-    avgPE,
-    avgROE,
-    avgGrowth: parseFloat(avgGrowth),
-    strength,
     companyCount: companies.length,
+    avgPE: peVals.length ? (avg(peVals).toFixed(1)) : null,
+    avgROE: roeVals.length ? (avg(roeVals).toFixed(1)) : null,
+    avgROA: roaVals.length ? (avg(roaVals).toFixed(1)) : null,
+    avgGrowth,
+    strength,
+    totalRevenue: revenueVals.length ? revenueVals.reduce((a, b) => a + b, 0) : null,
+    avgPATMargin: patMarginVals.length ? fmt1(avg(patMarginVals)) : null,
+    avgNII: niiVals.length ? avg(niiVals) : null,
+    totalAssets: totalAssetsVals.length ? totalAssetsVals.reduce((a, b) => a + b, 0) : null,
+    avgDivYield: divYieldVals.length ? fmt1(avg(divYieldVals)) : null,
+    avgRevenueGrowth: revenueGrowthVals.length ? fmt1(avg(revenueGrowthVals)) : null,
+    avgPATGrowth: patGrowthVals.length ? fmt1(avg(patGrowthVals)) : null,
   };
 }
 
@@ -1951,23 +1960,35 @@ function showView(view) {
 // ---- Sector Overview ----
 const SECTOR_DISPLAY = {
   'Banking': { emoji: '🏦', label: 'Banking' },
-  'Telecommunication and Technology': { emoji: '📱', label: 'Telecoms' },
-  'Telecoms': { emoji: '📱', label: 'Telecoms' },
   'Insurance': { emoji: '🛡️', label: 'Insurance' },
-  'FMCG': { emoji: '🛒', label: 'Consumer Goods' },
-  'Energy': { emoji: '⚡', label: 'Energy' },
-  'Energy and Petroleum': { emoji: '⚡', label: 'Energy' },
-  'Construction and Allied': { emoji: '🏗️', label: 'Construction' },
-  'Construction': { emoji: '🏗️', label: 'Construction' },
-  'Agricultural': { emoji: '🌾', label: 'Agriculture' },
+  'Telecoms & Technology': { emoji: '📱', label: 'Telecoms & Technology' },
+  'Consumer Goods': { emoji: '🛒', label: 'Consumer Goods' },
+  'Energy & Utilities': { emoji: '⚡', label: 'Energy & Utilities' },
   'Agriculture': { emoji: '🌾', label: 'Agriculture' },
   'Manufacturing': { emoji: '🏭', label: 'Manufacturing' },
+  'Media & Services': { emoji: '📺', label: 'Media & Services' },
+  'Diversified': { emoji: '📊', label: 'Diversified' },
+  // Legacy mappings (still in some company records)
+  'Telecommunication and Technology': { emoji: '📱', label: 'Telecoms & Technology' },
+  'Telecoms': { emoji: '📱', label: 'Telecoms & Technology' },
+  'FMCG': { emoji: '🛒', label: 'Consumer Goods' },
+  'Energy': { emoji: '⚡', label: 'Energy & Utilities' },
+  'Energy and Petroleum': { emoji: '⚡', label: 'Energy & Utilities' },
+  'Construction and Allied': { emoji: '🏭', label: 'Manufacturing' },
+  'Construction': { emoji: '🏭', label: 'Manufacturing' },
+  'Agricultural': { emoji: '🌾', label: 'Agriculture' },
+  'Agriculture': { emoji: '🌾', label: 'Agriculture' },
   'Manufacturing and Allied': { emoji: '🏭', label: 'Manufacturing' },
-  'Media': { emoji: '📺', label: 'Media' },
-  'Commercial and Services': { emoji: '🏢', label: 'Commercial' },
-  'Automobiles and Accessories': { emoji: '🚗', label: 'Automobiles' },
-  'Investment': { emoji: '📊', label: 'Investment' },
-  'Investment Services': { emoji: '📊', label: 'Investment' },
+  'Media': { emoji: '📺', label: 'Media & Services' },
+  'Hospitality': { emoji: '📺', label: 'Media & Services' },
+  'Logistics': { emoji: '📺', label: 'Media & Services' },
+  'Financial Services': { emoji: '🛡️', label: 'Insurance' },
+  'Real Estate': { emoji: '📊', label: 'Diversified' },
+  'Entertainment': { emoji: '📱', label: 'Telecoms & Technology' },
+  'Infrastructure': { emoji: '🏭', label: 'Manufacturing' },
+  'Commercial and Services': { emoji: '📺', label: 'Media & Services' },
+  'Investment': { emoji: '📊', label: 'Diversified' },
+  'Investment Services': { emoji: '📊', label: 'Diversified' },
 };
 
 function normalizeSector(sec) {
@@ -1998,27 +2019,99 @@ function renderSectorOverview() {
     return ai - bi;
   });
 
+  const SECTOR_ORDER = ['Banking', 'Insurance', 'Telecoms & Technology', 'Consumer Goods', 'Energy & Utilities', 'Agriculture', 'Manufacturing', 'Media & Services', 'Diversified'];
+
+  const sectorMetrics = {
+    'Banking':               (a) => [
+      a.avgNII      ? fmtKES(a.avgNII) + ' avg NII'           : null,
+      a.totalAssets ? fmtKES(a.totalAssets / (a.companyCount||1)) + ' avg assets' : null,
+      a.avgROE      ? 'ROE ' + a.avgROE + '%'                 : null,
+      a.avgPE       ? 'P/E ' + a.avgPE + 'x'                 : null,
+    ],
+    'Insurance':             (a) => [
+      a.avgROE      ? 'ROE ' + a.avgROE + '%'                 : null,
+      a.avgPE       ? 'P/E ' + a.avgPE + 'x'                 : null,
+      a.avgDivYield ? 'Div ' + a.avgDivYield + '%'           : null,
+      a.avgPATGrowth != null ? 'PAT growth ' + (a.avgPATGrowth >= 0 ? '+' : '') + a.avgPATGrowth + '%' : null,
+    ],
+    'Telecoms & Technology': (a) => [
+      a.totalRevenue ? fmtKES(a.totalRevenue) + ' revenue'   : null,
+      a.avgPATMargin ? a.avgPATMargin + '% net margin'        : null,
+      a.avgPE        ? 'P/E ' + a.avgPE + 'x'                : null,
+      a.avgDivYield  ? 'Div ' + a.avgDivYield + '%'          : null,
+    ],
+    'Consumer Goods':        (a) => [
+      a.avgRevenueGrowth != null ? 'Rev growth ' + (a.avgRevenueGrowth >= 0 ? '+' : '') + a.avgRevenueGrowth + '%' : null,
+      a.avgPATMargin ? a.avgPATMargin + '% net margin'        : null,
+      a.avgPE        ? 'P/E ' + a.avgPE + 'x'                : null,
+      a.avgDivYield  ? 'Div ' + a.avgDivYield + '%'          : null,
+    ],
+    'Energy & Utilities':    (a) => [
+      a.totalRevenue ? fmtKES(a.totalRevenue) + ' revenue'   : null,
+      a.avgROA       ? 'ROA ' + a.avgROA + '%'               : null,
+      a.avgROE       ? 'ROE ' + a.avgROE + '%'               : null,
+      a.avgPE        ? 'P/E ' + a.avgPE + 'x'               : null,
+    ],
+    'Agriculture':           (a) => [
+      a.avgPATMargin ? a.avgPATMargin + '% net margin'        : null,
+      a.avgROE       ? 'ROE ' + a.avgROE + '%'               : null,
+      a.avgDivYield  ? 'Div ' + a.avgDivYield + '%'          : null,
+      a.avgPE        ? 'P/E ' + a.avgPE + 'x'               : null,
+    ],
+    'Manufacturing':         (a) => [
+      a.totalRevenue ? fmtKES(a.totalRevenue) + ' revenue'   : null,
+      a.avgPATMargin ? a.avgPATMargin + '% net margin'        : null,
+      a.avgROE       ? 'ROE ' + a.avgROE + '%'               : null,
+      a.avgPE        ? 'P/E ' + a.avgPE + 'x'               : null,
+    ],
+    'Media & Services':      (a) => [
+      a.avgRevenueGrowth != null ? 'Rev growth ' + (a.avgRevenueGrowth >= 0 ? '+' : '') + a.avgRevenueGrowth + '%' : null,
+      a.avgPATMargin ? a.avgPATMargin + '% net margin'        : null,
+      a.avgROE       ? 'ROE ' + a.avgROE + '%'               : null,
+      a.avgPE        ? 'P/E ' + a.avgPE + 'x'               : null,
+    ],
+    'Diversified':           (a) => [
+      a.totalRevenue ? fmtKES(a.totalRevenue) + ' revenue'   : null,
+      a.avgROE       ? 'ROE ' + a.avgROE + '%'               : null,
+      a.avgDivYield  ? 'Div ' + a.avgDivYield + '%'          : null,
+      a.avgPE        ? 'P/E ' + a.avgPE + 'x'               : null,
+    ],
+  };
+
+  function fmtKES(n) {
+    if (!n) return '—';
+    if (n >= 1e9) return 'KES ' + (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return 'KES ' + (n / 1e6).toFixed(0) + 'M';
+    return 'KES ' + n.toFixed(0);
+  }
+
+  const sorted = SECTOR_ORDER.filter(s => sectors[s]);
+
   grid.innerHTML = sorted.map(sec => {
     const companies = sectors[sec];
     const withFinancials = companies.filter(c => c.annuals && c.annuals.length > 0).length;
-    const emoji = SECTOR_DISPLAY[sec]?.emoji || '📈';
-
-    // Calculate sector aggregates
+    const display = SECTOR_DISPLAY[sec] || { emoji: '📈', label: sec };
     const agg = calculateSectorAggregates(sec);
-    const strengthEmoji = agg.strength === 'up' ? '🟢' : agg.strength === 'down' ? '🔴' : '🟡';
+    const strengthEmoji = agg.strength === 'up' ? '▲' : agg.strength === 'down' ? '▼' : '—';
+    const strengthClass = agg.strength === 'up' ? 'pos' : agg.strength === 'down' ? 'neg' : 'neu';
+    const metrics = (sectorMetrics[sec] ? sectorMetrics[sec](agg) : []).filter(Boolean);
 
-    // Build stats row
-    let statsHtml = '<div class="sector-card-stats">';
-    if (agg.avgPE) statsHtml += '<span class="stat-badge">P/E: ' + agg.avgPE + 'x</span>';
-    if (agg.avgROE) statsHtml += '<span class="stat-badge">ROE: ' + agg.avgROE + '%</span>';
-    statsHtml += '<span class="stat-badge strength-' + agg.strength + '">' + strengthEmoji + ' ' + (agg.avgGrowth != null ? ((agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) + '%') : '—') + '</span>';
-    statsHtml += '</div>';
+    const metricsHtml = '<div class="sector-card-metrics">' +
+      metrics.map(m => '<div class="sector-metric-item">' + m + '</div>').join('') +
+    '</div>';
+
+    const trendHtml = '<div class="sector-card-trend ' + strengthClass + '">' +
+      strengthEmoji + ' ' + (agg.avgGrowth != null ? ((agg.avgGrowth >= 0 ? '+' : '') + agg.avgGrowth.toFixed(1) + '%') : '—') +
+      ' avg price</div>';
 
     return '<div class="sector-card" onclick="renderSectorTable(\'' + sec.replace(/'/g, "\\'") + '\')">' +
-      '<div class="sector-card-emoji">' + emoji + '</div>' +
-      '<div class="sector-card-name">' + sec + '</div>' +
-      '<div class="sector-card-count">' + companies.length + ' companies' + (withFinancials > 0 ? ' · ' + withFinancials + ' with financials' : '') + '</div>' +
-      statsHtml +
+      '<div class="sector-card-header">' +
+        '<span class="sector-card-emoji">' + display.emoji + '</span>' +
+        trendHtml +
+      '</div>' +
+      '<div class="sector-card-name">' + display.label + '</div>' +
+      '<div class="sector-card-count">' + companies.length + ' co · ' + withFinancials + ' with data</div>' +
+      metricsHtml +
     '</div>';
   }).join('');
 }
@@ -2267,12 +2360,15 @@ function closeMobileMenu() {
   }
 }
 
-// Close mobile menu when clicking outside
+// Close mobile menu when clicking on the backdrop (outside the panel)
 document.addEventListener('click', (e) => {
   const menu = document.getElementById('mobile-menu');
+  const menuContent = document.querySelector('.mobile-menu-content');
   const hamburger = document.getElementById('hamburger-menu');
-  if (menu && hamburger && !menu.contains(e.target) && !hamburger.contains(e.target)) {
-    closeMobileMenu();
+  if (menu && !menu.classList.contains('hidden') && menuContent && hamburger) {
+    if (!menuContent.contains(e.target) && !hamburger.contains(e.target)) {
+      closeMobileMenu();
+    }
   }
 });
 
