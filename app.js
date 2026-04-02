@@ -524,6 +524,8 @@ function makeBarChart(canvasId, labels, datasets, opts = {}) {
   if (!ctx) return;
   if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
 
+  // Apply sharp corners to all bar datasets
+  datasets = datasets.map(ds => ({ borderRadius: 2, borderSkipped: false, ...ds }));
   chartInstances[canvasId] = new Chart(ctx, {
     type: 'bar',
     data: { labels, datasets },
@@ -852,7 +854,7 @@ function renderPriceChart(ticker, range) {
           backgroundColor: gradientFill,
           pointRadius: 0,
           pointHitRadius: 8,
-          tension: 0.1,
+          tension: 0,
         }]
       },
       options: {
@@ -1181,7 +1183,7 @@ function renderCharts(co, period, template) {
     row.charts.forEach(chart => {
       const canvasId = 'chart-' + chart.id;
       makeBarChart(canvasId, labels,
-        [{ label: chart.title, data: dp.map(d => d[chart.key]), backgroundColor: colors, borderRadius: 6 }],
+        [{ label: chart.title, data: dp.map(d => d[chart.key]), backgroundColor: colors, borderRadius: 2 }],
         { ...opts, isCurrency: chart.isCurrency || false }
       );
     });
@@ -2080,6 +2082,95 @@ function renderSectorHeatmap() {
   el.innerHTML =
     `<div class="heatmap-row">${renderRow(row1)}</div>` +
     (row2.length ? `<div class="heatmap-row">${renderRow(row2)}</div>` : '');
+
+  renderSectorMarketSummary(sectorData, totalMcap);
+}
+
+function renderSectorMarketSummary(sectorData, totalMcap) {
+  const el = document.getElementById('sector-market-summary');
+  if (!el) return;
+
+  function fmtMcap(v) {
+    if (v >= 1e12) return 'KES ' + (v / 1e12).toFixed(2) + 'T';
+    if (v >= 1e9)  return 'KES ' + (v / 1e9).toFixed(0) + 'B';
+    return 'KES ' + (v / 1e6).toFixed(0) + 'M';
+  }
+
+  // For each sector find top contributors and build a concise insight
+  const items = sectorData.map(d => {
+    const cos = Object.entries(NSE_COMPANIES)
+      .filter(([, co]) => normalizeSector(co.sector) === d.sec)
+      .map(([ticker, co]) => {
+        const mc = getCompanyMarketCap(co);
+        const latest = co.annuals && co.annuals[0];
+        return { ticker, name: co.name, mc, latest, price: co.latestPrice, chg: co.priceChangePct };
+      })
+      .filter(c => c.mc)
+      .sort((a, b) => b.mc - a.mc);
+
+    if (!cos.length) return null;
+
+    const top = cos[0];
+    const top2 = cos[1];
+    const topShare = ((top.mc / d.totalMcap) * 100).toFixed(0);
+    const sectorShare = ((d.totalMcap / totalMcap) * 100).toFixed(1);
+
+    // Build insight sentence
+    let insight = '';
+    const latest = top.latest || {};
+
+    if (d.sec === 'Banking') {
+      const nii = latest.nii ? fmtMcap(latest.nii * 1000) : null;
+      insight = `<b>${top.name}</b> leads with ${fmtMcap(top.mc)} (${topShare}% of sector).` +
+        (nii ? ` Net interest income of ${nii} underpins its valuation.` : '') +
+        (top2 ? ` <b>${top2.name}</b> (${fmtMcap(top2.mc)}) follows closely.` : '');
+    } else if (d.sec === 'Telecoms & Technology') {
+      const rev = latest.revenue ? fmtMcap(latest.revenue * 1000) : null;
+      insight = `<b>${top.name}</b> accounts for ${topShare}% of sector cap at ${fmtMcap(top.mc)}, making it the single largest stock on the NSE.` +
+        (rev ? ` Annual revenue of ${rev} and dominant M-PESA market share justify the premium.` : '');
+    } else if (d.sec === 'Consumer Goods') {
+      const rev = latest.revenue ? fmtMcap(latest.revenue * 1000) : null;
+      insight = `<b>${top.name}</b> dominates at ${fmtMcap(top.mc)} (${topShare}% of sector).` +
+        (rev ? ` Revenue of ${rev} is driven by beer, spirits and non-alcoholic beverages across East Africa.` : '') +
+        (top2 ? ` <b>${top2.name}</b> adds ${fmtMcap(top2.mc)}.` : '');
+    } else if (d.sec === 'Insurance') {
+      insight = `<b>${top.name}</b> leads at ${fmtMcap(top.mc)} (${topShare}% of sector), backed by a diversified insurance and financial services portfolio.` +
+        (top2 ? ` <b>${top2.name}</b> (${fmtMcap(top2.mc)}) is the second largest with life and general insurance operations.` : '');
+    } else if (d.sec === 'Energy & Utilities') {
+      insight = `<b>${top.name}</b> is the primary contributor at ${fmtMcap(top.mc)} (${topShare}% of sector).` +
+        (d.sec === 'Energy & Utilities' && top.ticker === 'KPLC' ? ' Kenya Power\'s regulated monopoly on electricity distribution underpins its value.' : ' KenGen\'s installed generation capacity of ~1,800 MW across hydro, geothermal and wind assets drives its valuation.') +
+        (top2 ? ` <b>${top2.name}</b> contributes ${fmtMcap(top2.mc)}.` : '');
+    } else if (d.sec === 'Agriculture') {
+      insight = `<b>${top.name}</b> leads at ${fmtMcap(top.mc)} (${topShare}% of sector). Tea companies benefit from strong export demand but are exposed to weather and global commodity prices.` +
+        (top2 ? ` <b>${top2.name}</b> adds ${fmtMcap(top2.mc)}.` : '');
+    } else if (d.sec === 'Manufacturing') {
+      const margin = latest.pat && latest.revenue ? ((latest.pat / latest.revenue) * 100).toFixed(1) : null;
+      insight = `<b>${top.name}</b> leads at ${fmtMcap(top.mc)} (${topShare}% of sector).` +
+        (margin ? ` Net margin of ${margin}% reflects tight industrial margins.` : '') +
+        (top2 ? ` <b>${top2.name}</b> (${fmtMcap(top2.mc)}) follows.` : '');
+    } else if (d.sec === 'Media & Services') {
+      insight = `<b>${top.name}</b> is the largest contributor at ${fmtMcap(top.mc)} (${topShare}% of sector). The sector faces headwinds from digital disruption in traditional media and sluggish consumer spending.` +
+        (top2 ? ` <b>${top2.name}</b> adds ${fmtMcap(top2.mc)}.` : '');
+    } else {
+      insight = `<b>${top.name}</b> is the primary contributor at ${fmtMcap(top.mc)} (${topShare}% of sector).` +
+        (top2 ? ` <b>${top2.name}</b> accounts for ${fmtMcap(top2.mc)}.` : '');
+    }
+
+    const chgClass = d.avgChange >= 0 ? 'pos' : 'neg';
+    const chgStr = (d.avgChange >= 0 ? '+' : '') + d.avgChange.toFixed(1) + '%';
+
+    return `<div class="summary-sector-item">
+      <div class="summary-sector-header">
+        <span class="summary-sector-name">${d.emoji} ${d.label}</span>
+        <span class="summary-sector-mcap">${fmtMcap(d.totalMcap)}</span>
+        <span class="summary-sector-share">${sectorShare}% of market</span>
+        <span class="summary-sector-chg ${chgClass}">${chgStr}</span>
+      </div>
+      <div class="summary-sector-insight">${insight}</div>
+    </div>`;
+  }).filter(Boolean);
+
+  el.innerHTML = items.join('');
 }
 
 function renderSectorOverview() {

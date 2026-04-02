@@ -560,11 +560,78 @@ select optgroup { background: var(--bg-surface); color: #000; font-weight: 700; 
   text-transform: none;
   letter-spacing: 0;
 }
+.sector-heatmap-row {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+}
 #sector-heatmap {
+  flex: 0 0 50%;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
 }
+.heatmap-row {
+  display: flex;
+  flex: 1;
+}
+#sector-market-summary {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow-y: auto;
+  max-height: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.summary-sector-item {
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--border-dim);
+  transition: background 0.15s;
+}
+.summary-sector-item:last-child { border-bottom: none; }
+.summary-sector-item:hover { background: var(--bg-hover); }
+.summary-sector-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+  flex-wrap: wrap;
+}
+.summary-sector-name {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  flex: 1;
+}
+.summary-sector-mcap {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+}
+.summary-sector-share {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+.summary-sector-chg {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+.summary-sector-chg.pos { color: #10b981; background: rgba(16,185,129,0.12); }
+.summary-sector-chg.neg { color: #ef4444; background: rgba(239,68,68,0.12); }
+.summary-sector-insight {
+  font-size: 0.71rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.summary-sector-insight b { color: var(--text-primary); }
+
 .heatmap-row {
   display: flex;
   height: 90px;
@@ -2099,6 +2166,11 @@ body.light .chart-type-btn:hover { background: rgba(0,0,0,0.06); }
     padding: 0.5rem 1rem;
     font-size: 0.8rem;
   }
+
+  /* ── Sector Heatmap ─────────────────────────── */
+  .sector-heatmap-row { flex-direction: column; }
+  #sector-heatmap { flex: none; }
+  #sector-market-summary { max-height: 220px; }
 
   /* ── Sector Grid ─────────────────────────────── */
   .sector-grid {
